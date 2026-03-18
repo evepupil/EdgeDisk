@@ -1,0 +1,22 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "edgedisk",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-03-18",
+  "r2_buckets": [
+    {
+      "binding": "DISK",
+      "bucket_name": "edgedisk"
+    }
+  ],
+  "kv_namespaces": [
+    {
+      "binding": "SHARES",
+      "id": "replace-with-your-kv-namespace-id"
+    }
+  ],
+  "vars": {
+    "APP_NAME": "EdgeDisk",
+    "MAX_LIST_KEYS": "1000"
+  }
+}
