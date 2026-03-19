@@ -21,6 +21,23 @@
 - Cloudflare KV：保存分享短链映射
 - Cloudflare Access：保护 `/app` 和 `/api/*`
 
+## 目录结构
+
+```text
+src/
+  index.ts            # Worker 入口
+  server/             # 后端路由、鉴权、R2/KV 逻辑
+  views/              # 后台页与分享页模板
+```
+
+- `src/server/routes.ts`：路由分发
+- `src/server/auth.ts`：Zero Trust / Access 校验
+- `src/server/objects.ts`：R2 文件与目录操作
+- `src/server/shares.ts`：短链分享、过期、撤销
+- `src/server/path.ts`：路径和参数解析
+- `src/views/dashboard.ts`：后台页面
+- `src/views/share.ts`：公开分享页
+
 ## 路由
 
 - `/app`：后台 UI
