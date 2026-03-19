@@ -4,6 +4,7 @@ export interface Env {
   ACCESS_TEAM_DOMAIN?: string;
   ADMIN_EMAIL?: string;
   MAX_LIST_KEYS?: string;
+  IMPORT_MAX_BYTES?: string;
   DISABLE_ACCESS_AUTH?: string;
   DISK: R2Bucket;
   SHARES: KVNamespace;

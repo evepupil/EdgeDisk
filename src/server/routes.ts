@@ -1,6 +1,7 @@
 import { requireAdmin } from "./auth.ts";
 import { HttpError } from "./errors.ts";
 import { html, json } from "./http.ts";
+import { importFromUrl } from "./imports.ts";
 import { createFolder, deleteObject, getObjectDetail, handleUpload, listDirectory, moveObject, streamObject } from "./objects.ts";
 import { normalizeAnyPath, normalizeDirectoryPath, normalizeFilePath, normalizeOptionalRelativePath, parseOptionalNonNegativeNumber, parseShareKind } from "./path.ts";
 import { createShare, getShareRecord, getShareView, listSharesByTarget, retargetSharesForMove, revokeShare, revokeSharesForPath, streamSharedObject } from "./shares.ts";
@@ -77,6 +78,17 @@ export async function routeRequest(request: Request, env: Env): Promise<Response
     const result = await moveObject(env, sourcePath, targetPath);
     const updatedShares = await retargetSharesForMove(env, sourcePath, targetPath, kind === "folder");
     return json({ ...result, updatedShares });
+  }
+
+  if (path === "/api/import-url" && request.method === "POST") {
+    await requireAdmin(request, env);
+    const payload = await request.json<Record<string, unknown>>();
+    const sourceUrl = String(payload.url || "");
+    const directory = normalizeDirectoryPath(String(payload.directory || ""));
+    const fileName = String(payload.fileName || "").trim() || undefined;
+    const overwrite = Boolean(payload.overwrite);
+    if (!sourceUrl) throw new HttpError(400, "缺少下载 URL");
+    return json(await importFromUrl(env, { sourceUrl, directory, fileName, overwrite }), 201);
   }
 
   if (path === "/api/share" && request.method === "POST") {

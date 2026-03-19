@@ -18,6 +18,7 @@
   ],
   "vars": {
     "APP_NAME": "EdgeDisk",
-    "MAX_LIST_KEYS": "1000"
+    "MAX_LIST_KEYS": "1000",
+    "IMPORT_MAX_BYTES": "536870912"
   }
 }
