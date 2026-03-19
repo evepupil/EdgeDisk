@@ -156,6 +156,32 @@ export async function revokeSharesForPath(env: Env, path: string, recursiveFolde
   return revoked;
 }
 
+export async function retargetSharesForMove(env: Env, sourcePath: string, targetPath: string, recursiveFolder: boolean): Promise<number> {
+  let cursor: string | undefined;
+  let updated = 0;
+
+  do {
+    const batch = await env.SHARES.list({ prefix: "share:", cursor, limit: 1000 });
+    for (const key of batch.keys) {
+      const code = key.name.slice("share:".length);
+      const record = await getShareRecordRaw(env, code);
+      if (!record) continue;
+
+      const nextPath = computeRetargetedSharePath(record.path, sourcePath, targetPath, recursiveFolder);
+      if (!nextPath) continue;
+
+      await env.SHARES.delete(shareTargetIndexKey(record.kind, record.path, code));
+      record.path = nextPath;
+      await env.SHARES.put(shareStorageKey(code), JSON.stringify(record));
+      await env.SHARES.put(shareTargetIndexKey(record.kind, record.path, code), "1");
+      updated += 1;
+    }
+    cursor = batch.list_complete ? undefined : batch.cursor;
+  } while (cursor);
+
+  return updated;
+}
+
 async function getShareRecordRaw(env: Env, shareCode: string): Promise<ShareRecord | null> {
   if (!/^[A-Za-z0-9_-]{6,20}$/.test(shareCode)) return null;
   const raw = await env.SHARES.get(shareStorageKey(shareCode));
@@ -201,4 +227,16 @@ function shareTargetIndexKey(kind: ShareKind, path: string, code: string): strin
 
 function shareTargetIndexPrefix(kind: ShareKind, path: string): string {
   return `share-target:${kind}:${encodePathForShareKey(path)}|`;
+}
+
+function computeRetargetedSharePath(recordPath: string, sourcePath: string, targetPath: string, recursiveFolder: boolean): string | null {
+  if (!recursiveFolder) {
+    return recordPath === sourcePath ? targetPath : null;
+  }
+
+  if (!recordPath.startsWith(sourcePath)) {
+    return null;
+  }
+
+  return `${targetPath}${recordPath.slice(sourcePath.length)}`;
 }

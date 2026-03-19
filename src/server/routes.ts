@@ -1,9 +1,9 @@
 import { requireAdmin } from "./auth.ts";
 import { HttpError } from "./errors.ts";
 import { html, json } from "./http.ts";
-import { deleteObject, getObjectDetail, handleUpload, listDirectory, streamObject } from "./objects.ts";
+import { createFolder, deleteObject, getObjectDetail, handleUpload, listDirectory, moveObject, streamObject } from "./objects.ts";
 import { normalizeAnyPath, normalizeDirectoryPath, normalizeFilePath, normalizeOptionalRelativePath, parseOptionalNonNegativeNumber, parseShareKind } from "./path.ts";
-import { createShare, getShareRecord, getShareView, listSharesByTarget, revokeShare, revokeSharesForPath, streamSharedObject } from "./shares.ts";
+import { createShare, getShareRecord, getShareView, listSharesByTarget, retargetSharesForMove, revokeShare, revokeSharesForPath, streamSharedObject } from "./shares.ts";
 import type { Env } from "./types.ts";
 import { renderDashboardHtml } from "../views/dashboard.ts";
 import { renderShareHtml } from "../views/share.ts";
@@ -55,6 +55,28 @@ export async function routeRequest(request: Request, env: Env): Promise<Response
     const formData = await request.formData();
     const basePath = normalizeDirectoryPath(String(formData.get("basePath") || ""));
     return json(await handleUpload(formData, env, basePath), 201);
+  }
+
+  if (path === "/api/folder" && request.method === "POST") {
+    await requireAdmin(request, env);
+    const payload = await request.json<Record<string, unknown>>();
+    const rawPath = String(payload.path || "");
+    if (!rawPath) throw new HttpError(400, "缺少 path 参数");
+    return json(await createFolder(env, normalizeDirectoryPath(rawPath)), 201);
+  }
+
+  if (path === "/api/move" && request.method === "POST") {
+    await requireAdmin(request, env);
+    const payload = await request.json<Record<string, unknown>>();
+    const kind = parseShareKind(payload.kind);
+    const rawPath = String(payload.path || "");
+    const rawTargetPath = String(payload.targetPath || "");
+    if (!rawPath || !rawTargetPath) throw new HttpError(400, "缺少移动参数");
+    const sourcePath = kind === "folder" ? normalizeDirectoryPath(rawPath) : normalizeFilePath(rawPath);
+    const targetPath = kind === "folder" ? normalizeDirectoryPath(rawTargetPath) : normalizeFilePath(rawTargetPath);
+    const result = await moveObject(env, sourcePath, targetPath);
+    const updatedShares = await retargetSharesForMove(env, sourcePath, targetPath, kind === "folder");
+    return json({ ...result, updatedShares });
   }
 
   if (path === "/api/share" && request.method === "POST") {

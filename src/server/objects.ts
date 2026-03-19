@@ -2,13 +2,15 @@ import { HttpError } from "./errors.ts";
 import { baseName, joinPath, normalizeRelativeFilePath, toPositiveInteger } from "./path.ts";
 import type { Env, ListedFile, ListedFolder } from "./types.ts";
 
+export const FOLDER_MARKER = ".__edgedisk_folder__";
+
 export async function listDirectory(env: Env, prefix: string) {
   const list = await env.DISK.list({ prefix, delimiter: "/", limit: toPositiveInteger(env.MAX_LIST_KEYS, 1000) });
   const folders: ListedFolder[] = (list.delimitedPrefixes || [])
     .map((item) => ({ kind: "folder" as const, name: baseName(item.slice(0, -1)), path: item }))
     .sort((a, b) => a.path.localeCompare(b.path, "zh-CN"));
   const files: ListedFile[] = list.objects
-    .filter((item) => item.key !== prefix)
+    .filter((item) => item.key !== prefix && baseName(item.key) !== FOLDER_MARKER)
     .map((item) => ({
       kind: "file" as const,
       name: baseName(item.key),
@@ -69,6 +71,43 @@ export async function handleUpload(formData: FormData, env: Env, basePath: strin
   return { uploaded };
 }
 
+export async function createFolder(env: Env, folderPath: string) {
+  const markerKey = joinPath(folderPath, FOLDER_MARKER);
+  const exists = await env.DISK.head(markerKey);
+  if (exists) throw new HttpError(409, "文件夹已存在");
+  await env.DISK.put(markerKey, new Uint8Array(0), {
+    httpMetadata: { contentType: "application/x-edgedisk-folder-placeholder" }
+  });
+  return { created: true, kind: "folder", path: folderPath };
+}
+
+export async function moveObject(env: Env, sourcePath: string, targetPath: string) {
+  if (sourcePath === targetPath) throw new HttpError(400, "目标路径不能和原路径相同");
+
+  if (sourcePath.endsWith("/")) {
+    if (!targetPath.endsWith("/")) throw new HttpError(400, "文件夹目标路径必须以 / 结尾");
+    if (targetPath.startsWith(sourcePath)) throw new HttpError(400, "不能把文件夹移动到自己的子目录中");
+    const sourceKeys = await collectObjectKeys(env, sourcePath);
+    if (!sourceKeys.length) throw new HttpError(404, "源文件夹不存在");
+    const existingTargetKeys = await collectObjectKeys(env, targetPath);
+    if (existingTargetKeys.length) throw new HttpError(409, "目标文件夹已存在内容");
+
+    for (const sourceKey of sourceKeys) {
+      const suffix = sourceKey.slice(sourcePath.length);
+      await copyObject(env, sourceKey, joinPath(targetPath, suffix));
+    }
+    await env.DISK.delete(sourceKeys);
+    return { moved: sourceKeys.length, kind: "folder", path: sourcePath, targetPath };
+  }
+
+  const head = await env.DISK.head(sourcePath);
+  if (!head) throw new HttpError(404, "源文件不存在");
+  if (await env.DISK.head(targetPath)) throw new HttpError(409, "目标文件已存在");
+  await copyObject(env, sourcePath, targetPath);
+  await env.DISK.delete(sourcePath);
+  return { moved: 1, kind: "file", path: sourcePath, targetPath };
+}
+
 export async function deleteObject(env: Env, path: string) {
   if (path.endsWith("/")) {
     const keys = await collectObjectKeys(env, path);
@@ -95,6 +134,7 @@ export async function countDirectoryObjects(env: Env, prefix: string) {
   do {
     const batch = await env.DISK.list({ prefix, cursor, limit: 1000 });
     for (const object of batch.objects) {
+      if (baseName(object.key) === FOLDER_MARKER) continue;
       childCount += 1;
       totalSize += object.size;
     }
@@ -112,6 +152,15 @@ export async function collectObjectKeys(env: Env, prefix: string): Promise<strin
     cursor = batch.truncated ? batch.cursor : undefined;
   } while (cursor);
   return keys;
+}
+
+async function copyObject(env: Env, sourceKey: string, targetKey: string) {
+  const object = await env.DISK.get(sourceKey);
+  if (!object) throw new HttpError(404, `对象不存在：${sourceKey}`);
+  await env.DISK.put(targetKey, object.body, {
+    httpMetadata: object.httpMetadata,
+    customMetadata: object.customMetadata
+  });
 }
 
 export function objectToResponse(object: R2ObjectBody, fileName: string, download: boolean): Response {
