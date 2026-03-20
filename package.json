@@ -18,6 +18,7 @@
     "wrangler": "^4.75.0"
   },
   "dependencies": {
+    "@hono/zod-validator": "^0.7.6",
     "drizzle-orm": "^0.45.1",
     "hono": "^4.10.4",
     "honox": "^0.1.55",
