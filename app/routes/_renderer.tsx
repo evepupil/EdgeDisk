@@ -1,5 +1,5 @@
-import { jsxRenderer } from 'hono/jsx-renderer'
-import { styles } from '../../src/views/styles'
+﻿import { jsxRenderer } from 'hono/jsx-renderer'
+import { styles } from '../styles/theme'
 
 export default jsxRenderer(({ children, title }: any) => {
   return (
@@ -14,3 +14,4 @@ export default jsxRenderer(({ children, title }: any) => {
     </html>
   )
 })
+

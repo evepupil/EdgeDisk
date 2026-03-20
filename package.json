@@ -1,4 +1,4 @@
-{
+﻿{
   "name": "edgedisk",
   "version": "0.1.0",
   "private": true,
@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "deploy": "wrangler deploy",
+    "deploy": "npm run build && wrangler deploy",
     "check": "tsc --noEmit"
   },
   "devDependencies": {
@@ -14,11 +14,11 @@
     "@hono/vite-build": "^1.10.1",
     "@hono/vite-dev-server": "^0.25.1",
     "typescript": "^5.9.3",
-    "vite": "^7.1.7",
+    "vite": "^7.3.1",
     "wrangler": "^4.75.0"
   },
   "dependencies": {
-    "@hono/zod-validator": "^0.7.6",
+    "@hono/zod-validator": "^0.7.4",
     "drizzle-orm": "^0.45.1",
     "hono": "^4.10.4",
     "honox": "^0.1.55",
