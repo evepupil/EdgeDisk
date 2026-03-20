@@ -7,8 +7,10 @@
     "strict": true,
     "noEmit": true,
     "skipLibCheck": true,
-    "types": ["@cloudflare/workers-types"],
-    "lib": ["ES2022"]
+    "types": ["@cloudflare/workers-types", "vite/client"],
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
+    "jsxImportSource": "hono/jsx"
   },
-  "include": ["src/**/*.ts"]
+  "include": ["app/**/*.ts", "app/**/*.tsx", "src/**/*.ts", "vite.config.ts"]
 }

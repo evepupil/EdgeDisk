@@ -1,7 +1,10 @@
-﻿{
+{
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "edgedisk",
-  "main": "src/index.ts",
+  "main": "dist/index.js",
+  "assets": {
+    "directory": "dist"
+  },
   "keep_vars": true,
   "compatibility_date": "2026-03-18",
   "r2_buckets": [
@@ -40,5 +43,8 @@
     "APP_NAME": "EdgeDisk",
     "MAX_LIST_KEYS": "1000",
     "IMPORT_MAX_BYTES": "536870912"
-  }
+  },
+  "compatibility_flags": [
+    "nodejs_compat"
+  ]
 }
