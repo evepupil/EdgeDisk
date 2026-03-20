@@ -9,25 +9,25 @@ import { normalizeAnyPath, normalizeDirectoryPath, normalizeFilePath, parseOptio
 import { createShare, listSharesByTarget, retargetSharesForMove, revokeShare, revokeSharesForPath } from './shares'
 import type { Env, SessionInfo } from './types'
 
-const pathQuerySchema = z.object({ path: z.string().trim().min(1, '?? path ??') })
+const pathQuerySchema = z.object({ path: z.string().trim().min(1, '缺少 path 参数') })
 const listQuerySchema = z.object({ prefix: z.string().optional() })
 const importTaskQuerySchema = z.object({ limit: z.string().optional() })
-const fileQuerySchema = z.object({ path: z.string().trim().min(1, '?? path ??'), download: z.string().optional() })
-const folderSchema = z.object({ path: z.string().trim().min(1, '?? path ??') })
+const fileQuerySchema = z.object({ path: z.string().trim().min(1, '缺少 path 参数'), download: z.string().optional() })
+const folderSchema = z.object({ path: z.string().trim().min(1, '缺少 path 参数') })
 const moveSchema = z.object({
   kind: z.enum(['file', 'folder']),
-  path: z.string().trim().min(1, '??????'),
-  targetPath: z.string().trim().min(1, '??????')
+  path: z.string().trim().min(1, '缺少移动参数'),
+  targetPath: z.string().trim().min(1, '缺少移动参数')
 })
 const shareCreateSchema = z.object({
   kind: z.enum(['file', 'folder']),
-  path: z.string().trim().min(1, '???????'),
+  path: z.string().trim().min(1, '分享参数不完整'),
   expiresInDays: z.union([z.number(), z.string()]).optional().nullable()
 })
-const shareDeleteSchema = z.object({ code: z.string().trim().min(1, '?????') })
+const shareDeleteSchema = z.object({ code: z.string().trim().min(1, '缺少分享码') })
 const sharesQuerySchema = z.object({
   kind: z.enum(['file', 'folder']),
-  path: z.string().trim().min(1, '?? path ??')
+  path: z.string().trim().min(1, '缺少 path 参数')
 })
 
 type ApiEnv = {
@@ -115,7 +115,7 @@ api.post('/share', zValidator('json', shareCreateSchema), async (c) => {
 api.delete('/share', zValidator('query', shareDeleteSchema), async (c) => {
   const query = c.req.valid('query')
   const revoked = await revokeShare(c.env, query.code)
-  if (!revoked) throw new HttpError(404, '?????????')
+  if (!revoked) throw new HttpError(404, '分享不存在或已失效')
   return c.json({ revoked: true, code: query.code })
 })
 

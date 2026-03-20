@@ -32,11 +32,6 @@
         "binding": "IMPORT_QUEUE",
         "queue": "edgedisk-imports"
       }
-    ],
-    "consumers": [
-      {
-        "queue": "edgedisk-imports"
-      }
     ]
   },
   "vars": {
@@ -46,5 +41,8 @@
   },
   "compatibility_flags": [
     "nodejs_compat"
-  ]
+  ],
+  "build": {
+    "command": "npm run build"
+  }
 }

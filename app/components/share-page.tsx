@@ -8,21 +8,21 @@ export function SharePage(props: SharePageProps) {
     <div class="page" id="share-page" data-share-code={props.shareCode}>
       <section class="hero">
         <div>
-          <h1>{props.appName} ??</h1>
-          <p>????????????????????</p>
+          <h1>{props.appName} 分享</h1>
+          <p>浏览公开分享的文件或文件夹，并按需下载。</p>
         </div>
-        <div class="actions"><a class="btn" href="/app">????</a></div>
+        <div class="actions"><a class="btn" href="/app">进入后台</a></div>
       </section>
       <section class="card" style="margin-top:16px">
         <div class="card-head">
           <div>
-            <div class="muted">????</div>
+            <div class="muted">分享编号</div>
             <div class="mono">{props.shareCode}</div>
             <div class="crumbs" id="crumbs"></div>
           </div>
           <div class="actions">
-            <button class="btn" id="refresh">??</button>
-            <button class="btn primary" id="downloadSelected" disabled>????</button>
+            <button class="btn" id="refresh">刷新</button>
+            <button class="btn primary" id="downloadSelected" disabled>下载选中</button>
           </div>
         </div>
         <div class="card-body">
@@ -31,7 +31,7 @@ export function SharePage(props: SharePageProps) {
           <div class="table">
             <table>
               <thead>
-                <tr><th></th><th>??</th><th>??</th><th>??</th><th>????</th><th>??</th></tr>
+                <tr><th></th><th>名称</th><th>类型</th><th>大小</th><th>更新时间</th><th>操作</th></tr>
               </thead>
               <tbody id="rows"></tbody>
             </table>
