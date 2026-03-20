@@ -2,9 +2,6 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "edgedisk",
   "main": "dist/index.js",
-  "assets": {
-    "directory": "dist"
-  },
   "keep_vars": true,
   "compatibility_date": "2026-03-18",
   "r2_buckets": [
