@@ -1,6 +1,6 @@
-import { Script } from 'honox/server/components'
 import { createRoute } from 'honox/factory'
 import { DashboardPage } from '../../components/dashboard-page'
+import dashboardScript from '../../client/dashboard.ts?raw'
 import { requireAdmin } from '../../../src/server/auth'
 import type { Env } from '../../../src/server/types'
 
@@ -11,7 +11,7 @@ export default createRoute(async (c) => {
   return c.render(
     <>
       <DashboardPage appName={appName} />
-      <Script src="/app/client/dashboard.ts" />
+      <script type="module" dangerouslySetInnerHTML={{ __html: dashboardScript }} />
     </>
   )
 })

@@ -1,6 +1,6 @@
-import { Script } from 'honox/server/components'
 import { createRoute } from 'honox/factory'
 import { SharePage } from '../../components/share-page'
+import shareScript from '../../client/share.ts?raw'
 import { getShareRecord } from '../../../src/server/shares'
 import type { Env } from '../../../src/server/types'
 
@@ -12,7 +12,7 @@ export default createRoute(async (c) => {
   return c.render(
     <>
       <SharePage appName={appName} shareCode={shareCode} />
-      <Script src="/app/client/share.ts" />
+      <script type="module" dangerouslySetInnerHTML={{ __html: shareScript }} />
     </>
   )
 })
