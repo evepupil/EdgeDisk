@@ -1,13 +1,13 @@
+import { renderDashboardHtml } from "../views/dashboard.ts";
+import { renderShareHtml } from "../views/share.ts";
 import { requireAdmin } from "./auth.ts";
 import { HttpError } from "./errors.ts";
 import { html, json } from "./http.ts";
-import { importFromUrl } from "./imports.ts";
+import { createImportTask, listImportTasks } from "./import-tasks.ts";
 import { createFolder, deleteObject, getObjectDetail, handleUpload, listDirectory, moveObject, streamObject } from "./objects.ts";
 import { normalizeAnyPath, normalizeDirectoryPath, normalizeFilePath, normalizeOptionalRelativePath, parseOptionalNonNegativeNumber, parseShareKind } from "./path.ts";
 import { createShare, getShareRecord, getShareView, listSharesByTarget, retargetSharesForMove, revokeShare, revokeSharesForPath, streamSharedObject } from "./shares.ts";
 import type { Env } from "./types.ts";
-import { renderDashboardHtml } from "../views/dashboard.ts";
-import { renderShareHtml } from "../views/share.ts";
 
 export async function routeRequest(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url);
@@ -25,6 +25,11 @@ export async function routeRequest(request: Request, env: Env): Promise<Response
   if (path === "/api/list") {
     await requireAdmin(request, env);
     return json(await listDirectory(env, normalizeDirectoryPath(url.searchParams.get("prefix") || "")));
+  }
+
+  if (path === "/api/import-tasks") {
+    await requireAdmin(request, env);
+    return json({ tasks: await listImportTasks(env, url.searchParams.get("limit")) });
   }
 
   if (path === "/api/object" && request.method === "GET") {
@@ -81,14 +86,9 @@ export async function routeRequest(request: Request, env: Env): Promise<Response
   }
 
   if (path === "/api/import-url" && request.method === "POST") {
-    await requireAdmin(request, env);
-    const payload = await request.json<Record<string, unknown>>();
-    const sourceUrl = String(payload.url || "");
-    const directory = normalizeDirectoryPath(String(payload.directory || ""));
-    const fileName = String(payload.fileName || "").trim() || undefined;
-    const overwrite = Boolean(payload.overwrite);
-    if (!sourceUrl) throw new HttpError(400, "缺少下载 URL");
-    return json(await importFromUrl(env, { sourceUrl, directory, fileName, overwrite }), 201);
+    const session = await requireAdmin(request, env);
+    const payload = await request.json<unknown>();
+    return json(await createImportTask(env, session.email, payload), 202);
   }
 
   if (path === "/api/share" && request.method === "POST") {

@@ -1,4 +1,4 @@
-{
+﻿{
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "edgedisk",
   "main": "src/index.ts",
@@ -16,6 +16,26 @@
       "id": "e213e68599fa4bb8ad703b14b1b4d923"
     }
   ],
+  "d1_databases": [
+    {
+      "binding": "IMPORTS_DB",
+      "database_name": "edgedisk",
+      "database_id": "3fd28f72-073d-4b10-b50e-504af186bdad"
+    }
+  ],
+  "queues": {
+    "producers": [
+      {
+        "binding": "IMPORT_QUEUE",
+        "queue": "edgedisk-imports"
+      }
+    ],
+    "consumers": [
+      {
+        "queue": "edgedisk-imports"
+      }
+    ]
+  },
   "vars": {
     "APP_NAME": "EdgeDisk",
     "MAX_LIST_KEYS": "1000",

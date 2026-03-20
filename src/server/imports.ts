@@ -2,7 +2,7 @@ import { HttpError } from "./errors.ts";
 import { baseName, joinPath, sanitizePath, toPositiveInteger } from "./path.ts";
 import type { Env } from "./types.ts";
 
-type ImportInput = {
+export type ImportInput = {
   sourceUrl: string;
   directory: string;
   fileName?: string;
@@ -11,20 +11,29 @@ type ImportInput = {
 
 const DEFAULT_IMPORT_MAX_BYTES = 512 * 1024 * 1024;
 
+export class RetryableImportError extends HttpError {}
+
 export async function importFromUrl(env: Env, input: ImportInput) {
   const url = parseRemoteUrl(input.sourceUrl);
   assertSafeRemoteUrl(url);
 
-  const response = await fetch(url.toString(), {
-    method: "GET",
-    redirect: "follow",
-    headers: {
-      accept: "*/*"
-    }
-  });
+  let response: Response;
+  try {
+    response = await fetch(url.toString(), {
+      method: "GET",
+      redirect: "follow",
+      headers: {
+        accept: "*/*"
+      }
+    });
+  } catch (error) {
+    throw new RetryableImportError(503, error instanceof Error ? error.message : "远程下载失败");
+  }
 
   if (!response.ok) {
-    throw new HttpError(400, `远程下载失败：${response.status} ${response.statusText}`);
+    const message = `远程下载失败：${response.status} ${response.statusText}`;
+    if (isRetryableStatus(response.status)) throw new RetryableImportError(response.status, message);
+    throw new HttpError(400, message);
   }
 
   if (!response.body) {
@@ -65,7 +74,7 @@ export async function importFromUrl(env: Env, input: ImportInput) {
     ]);
   } catch (error) {
     if (error instanceof HttpError) throw error;
-    throw new HttpError(400, error instanceof Error ? error.message : "远程导入失败");
+    throw new RetryableImportError(503, error instanceof Error ? error.message : "远程导入失败");
   }
 
   return {
@@ -76,6 +85,10 @@ export async function importFromUrl(env: Env, input: ImportInput) {
     contentType: response.headers.get("content-type") || null,
     sourceUrl: url.toString()
   };
+}
+
+function isRetryableStatus(status: number): boolean {
+  return status === 408 || status === 425 || status === 429 || status >= 500;
 }
 
 function parseRemoteUrl(rawUrl: string): URL {
