@@ -122,14 +122,16 @@ export async function deleteObject(env: Env, path: string) {
 }
 
 export async function streamObject(env: Env, path: string, download: boolean, request?: Request): Promise<Response> {
+  const head = await env.DISK.head(path);
+  if (!head) throw new HttpError(404, "文件不存在");
+
   const rangeHeader = request?.headers.get("range");
   if (rangeHeader) {
-    const range = parseRangeHeader(rangeHeader);
+    const range = parseRangeHeader(rangeHeader, head.size);
+    if (range === "unsatisfiable") return rangeNotSatisfiable(head.size);
     if (range) {
       const object = await env.DISK.get(path, { range: { offset: range.start, length: range.end - range.start + 1 } });
       if (!object) throw new HttpError(404, "文件不存在");
-      const head = await env.DISK.head(path);
-      if (!head) throw new HttpError(404, "文件不存在");
       return objectToRangeResponse(object, baseName(path), download, range, head.size);
     }
   }
@@ -139,16 +141,45 @@ export async function streamObject(env: Env, path: string, download: boolean, re
   return objectToResponse(object, baseName(path), download);
 }
 
-function parseRangeHeader(header: string): { start: number; end: number } | null {
-  const match = header.match(/^bytes=(\d+)-(\d*)$/);
+type ByteRange = { start: number; end: number };
+
+function parseRangeHeader(header: string, totalSize: number): ByteRange | "unsatisfiable" | null {
+  const match = header.match(/^bytes=(\d*)-(\d*)$/i);
   if (!match) return null;
-  const start = Number(match[1]);
-  const end = match[2] ? Number(match[2]) : start + 1024 * 1024 * 2 - 1; // default 2MB chunk
-  if (Number.isNaN(start) || Number.isNaN(end) || start > end) return null;
+
+  const rawStart = match[1];
+  const rawEnd = match[2];
+  if (!rawStart && !rawEnd) return null;
+
+  if (!rawStart) {
+    const suffixLength = Number(rawEnd);
+    if (Number.isNaN(suffixLength) || suffixLength <= 0) return null;
+    const length = Math.min(suffixLength, totalSize);
+    return { start: totalSize - length, end: totalSize - 1 };
+  }
+
+  const start = Number(rawStart);
+  if (Number.isNaN(start) || start < 0) return null;
+  if (start >= totalSize) return "unsatisfiable";
+
+  let end = rawEnd ? Number(rawEnd) : totalSize - 1;
+  if (Number.isNaN(end) || end < start) return "unsatisfiable";
+  end = Math.min(end, totalSize - 1);
   return { start, end };
 }
 
-function objectToRangeResponse(object: R2ObjectBody, fileName: string, download: boolean, range: { start: number; end: number }, totalSize: number): Response {
+function rangeNotSatisfiable(totalSize: number): Response {
+  return new Response(null, {
+    status: 416,
+    headers: {
+      "content-range": `bytes */${totalSize}`,
+      "accept-ranges": "bytes",
+      "cache-control": "private, max-age=0, no-store"
+    }
+  });
+}
+
+function objectToRangeResponse(object: R2ObjectBody, fileName: string, download: boolean, range: ByteRange, totalSize: number): Response {
   const headers = new Headers();
   object.writeHttpMetadata(headers);
   headers.set("etag", object.httpEtag || object.etag);

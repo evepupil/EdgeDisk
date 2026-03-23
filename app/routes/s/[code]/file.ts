@@ -7,7 +7,7 @@ export default createRoute(async (c) => {
   try {
     const env = c.env as Env
     const shareCode = c.req.param('code') || ''
-    return await streamSharedObject(env, shareCode, c.req.query('path') ?? null, c.req.query('download') === '1')
+    return await streamSharedObject(env, shareCode, c.req.query('path') ?? null, c.req.query('download') === '1', c.req.raw)
   } catch (error) {
     return respondError(error)
   }
