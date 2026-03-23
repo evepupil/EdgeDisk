@@ -121,10 +121,43 @@ export async function deleteObject(env: Env, path: string) {
   return { deleted: 1, kind: "file", path };
 }
 
-export async function streamObject(env: Env, path: string, download: boolean): Promise<Response> {
+export async function streamObject(env: Env, path: string, download: boolean, request?: Request): Promise<Response> {
+  const rangeHeader = request?.headers.get("range");
+  if (rangeHeader) {
+    const range = parseRangeHeader(rangeHeader);
+    if (range) {
+      const object = await env.DISK.get(path, { range: { offset: range.start, length: range.end - range.start + 1 } });
+      if (!object) throw new HttpError(404, "文件不存在");
+      const head = await env.DISK.head(path);
+      if (!head) throw new HttpError(404, "文件不存在");
+      return objectToRangeResponse(object, baseName(path), download, range, head.size);
+    }
+  }
+
   const object = await env.DISK.get(path);
   if (!object) throw new HttpError(404, "文件不存在");
   return objectToResponse(object, baseName(path), download);
+}
+
+function parseRangeHeader(header: string): { start: number; end: number } | null {
+  const match = header.match(/^bytes=(\d+)-(\d*)$/);
+  if (!match) return null;
+  const start = Number(match[1]);
+  const end = match[2] ? Number(match[2]) : start + 1024 * 1024 * 2 - 1; // default 2MB chunk
+  if (Number.isNaN(start) || Number.isNaN(end) || start > end) return null;
+  return { start, end };
+}
+
+function objectToRangeResponse(object: R2ObjectBody, fileName: string, download: boolean, range: { start: number; end: number }, totalSize: number): Response {
+  const headers = new Headers();
+  object.writeHttpMetadata(headers);
+  headers.set("etag", object.httpEtag || object.etag);
+  headers.set("accept-ranges", "bytes");
+  headers.set("content-range", `bytes ${range.start}-${range.end}/${totalSize}`);
+  headers.set("content-length", String(range.end - range.start + 1));
+  headers.set("cache-control", "private, max-age=0, no-store");
+  headers.set("content-disposition", `${download ? "attachment" : "inline"}; filename*=UTF-8''${encodeURIComponent(fileName)}`);
+  return new Response(object.body, { status: 206, headers });
 }
 
 export async function countDirectoryObjects(env: Env, prefix: string) {
@@ -167,6 +200,7 @@ export function objectToResponse(object: R2ObjectBody, fileName: string, downloa
   const headers = new Headers();
   object.writeHttpMetadata(headers);
   headers.set("etag", object.httpEtag || object.etag);
+  headers.set("accept-ranges", "bytes");
   headers.set("cache-control", "private, max-age=0, no-store");
   headers.set("content-disposition", `${download ? "attachment" : "inline"}; filename*=UTF-8''${encodeURIComponent(fileName)}`);
   return new Response(object.body, { headers });

@@ -1,6 +1,6 @@
 import { HttpError } from "./errors.ts";
 import { baseName, encodePathForShareKey, joinPath, normalizeRelativeFilePath, toPositiveInteger } from "./path.ts";
-import { objectToResponse } from "./objects.ts";
+import { streamObject } from "./objects.ts";
 import type { Env, ListedFile, ListedFolder, ShareKind, ShareRecord } from "./types.ts";
 
 export async function createShare(env: Env, createdBy: string, kind: ShareKind, path: string, expiresInDays: number | null, origin: string) {
@@ -126,16 +126,15 @@ export async function getShareView(env: Env, shareCode: string, sub: string, ori
   };
 }
 
-export async function streamSharedObject(env: Env, shareCode: string, rawRelativePath: string | null, download: boolean): Promise<Response> {
+export async function streamSharedObject(env: Env, shareCode: string, rawRelativePath: string | null, download: boolean, request?: Request): Promise<Response> {
   const share = await getShareRecord(env, shareCode);
   let key = share.path;
   if (share.kind === "folder") {
     if (!rawRelativePath) throw new HttpError(400, "文件夹分享下载时需要 path 参数");
     key = joinPath(share.path, normalizeRelativeFilePath(rawRelativePath));
   }
-  const object = await env.DISK.get(key);
-  if (!object) throw new HttpError(404, "分享文件不存在");
-  return objectToResponse(object, baseName(key), download);
+
+  return streamObject(env, key, download, request);
 }
 
 export async function revokeSharesForPath(env: Env, path: string, recursiveFolder: boolean): Promise<number> {

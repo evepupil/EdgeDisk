@@ -74,7 +74,7 @@ api.delete('/object', zValidator('query', pathQuerySchema), async (c) => {
 
 api.get('/file', zValidator('query', fileQuerySchema), async (c) => {
   const query = c.req.valid('query')
-  return await streamObject(c.env, normalizeFilePath(query.path), query.download === '1')
+  return await streamObject(c.env, normalizeFilePath(query.path), query.download === '1', c.req.raw)
 })
 
 api.post('/upload', async (c) => {

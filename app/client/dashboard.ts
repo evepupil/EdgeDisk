@@ -46,11 +46,24 @@ const viewStorageKey = 'edgedisk:view-mode';
       copyShare: document.getElementById('copyShare'),
       refreshShares: document.getElementById('refreshShares'),
       closeShare: document.getElementById('closeShare'),
-      shareList: document.getElementById('shareList')
+      shareList: document.getElementById('shareList'),
+      playerDialog: document.getElementById('playerDialog'),
+      playerTitle: document.getElementById('playerTitle'),
+      playerContainer: document.getElementById('playerContainer'),
+      playerDownload: document.getElementById('playerDownload'),
+      closePlayer: document.getElementById('closePlayer')
     };
 
     const numberFormat = new Intl.NumberFormat('zh-CN');
     const taskLabels = { queued: '排队中', running: '导入中', succeeded: '已完成', failed: '失败' };
+    const VIDEO_EXTS = new Set(['mp4','webm','ogv','mov','mkv','avi']);
+    const AUDIO_EXTS = new Set(['mp3','wav','ogg','flac','aac','m4a','wma','opus']);
+    function getMediaType(name) {
+      const ext = (name || '').split('.').pop().toLowerCase();
+      if (VIDEO_EXTS.has(ext)) return 'video';
+      if (AUDIO_EXTS.has(ext)) return 'audio';
+      return null;
+    }
 
     function escapeHtml(value) {
       return String(value)
@@ -206,14 +219,18 @@ const viewStorageKey = 'edgedisk:view-mode';
         );
       }
       for (const file of data.files) {
+        const mediaType = getMediaType(file.name);
+        const icon = mediaType === 'video' ? '🎬' : mediaType === 'audio' ? '🎵' : '📄';
+        const playBtn = mediaType ? actionButton('播放', 'play') : '';
         html.push(
           '<tr class="row" data-kind="file" data-path="' + escapeHtml(file.path) + '">' +
-            '<td class="name">📄 ' + escapeHtml(file.name) + '</td>' +
+            '<td class="name">' + icon + ' ' + escapeHtml(file.name) + '</td>' +
             '<td>文件</td>' +
             '<td>' + formatBytes(file.size) + '</td>' +
             '<td>' + escapeHtml(formatTime(file.uploaded)) + '</td>' +
             '<td>' + escapeHtml(file.contentType || '-') + '</td>' +
             '<td><div class="row-actions">' +
+              playBtn +
               actionButton('详情', 'detail') +
               actionButton('移动/重命名', 'move') +
               actionButton('分享', 'share') +
@@ -246,9 +263,12 @@ const viewStorageKey = 'edgedisk:view-mode';
         );
       }
       for (const file of data.files) {
+        const mediaType = getMediaType(file.name);
+        const icon = mediaType === 'video' ? '🎬' : mediaType === 'audio' ? '🎵' : '📄';
+        const playBtn = mediaType ? actionButton('播放', 'play') : '';
         html.push(
           '<div class="card-item" data-kind="file" data-path="' + escapeHtml(file.path) + '">' +
-            '<div class="card-item-top"><div class="card-icon">📄</div>' + actionButton('详情', 'detail') + '</div>' +
+            '<div class="card-item-top"><div class="card-icon">' + icon + '</div><div class="row-actions">' + playBtn + actionButton('详情', 'detail') + '</div></div>' +
             '<div class="card-name">' + escapeHtml(file.name) + '</div>' +
             '<div class="card-meta"><div>' + formatBytes(file.size) + '</div><div>' + escapeHtml(formatTime(file.uploaded)) + '</div><div class="row-actions">' +
               actionButton('移动/重命名', 'move') +
@@ -461,8 +481,26 @@ const viewStorageKey = 'edgedisk:view-mode';
       await load(state.prefix);
     }
 
+    function openPlayer(path) {
+      const name = path.split('/').pop() || path;
+      const mediaType = getMediaType(name);
+      if (!mediaType) return;
+      const url = fileUrl(path, false);
+      elements.playerTitle.textContent = (mediaType === 'video' ? '🎬 ' : '🎵 ') + name;
+      elements.playerContainer.innerHTML = '';
+      if (mediaType === 'video') {
+        elements.playerContainer.innerHTML = '<video controls src="' + escapeHtml(url) + '" style="width:100%;max-height:70vh"></video>';
+      } else {
+        elements.playerContainer.innerHTML = '<div class="audio-player"><div class="audio-icon">🎵</div><audio controls src="' + escapeHtml(url) + '" style="width:100%"></audio></div>';
+      }
+      elements.playerDownload.href = fileUrl(path, true);
+      elements.playerDownload.download = name;
+      elements.playerDialog.showModal();
+    }
+
     function handleItemAction(action, item) {
       if (action === 'enter') { void load(item.path); return; }
+      if (action === 'play') { openPlayer(item.path); return; }
       if (action === 'detail') { void showDetail(item.path).catch(function (error) { setStatus(error.message || '加载详情失败', 'error'); }); return; }
       if (action === 'share') { openShare(item); return; }
       if (action === 'move') { void moveTarget(item).catch(function (error) { setStatus(error.message || '移动失败', 'error'); }); return; }
@@ -485,8 +523,17 @@ const viewStorageKey = 'edgedisk:view-mode';
     elements.iconViewButton.onclick = function () { setViewMode('icon'); };
     elements.closeDetail.onclick = function () { elements.detailDialog.close(); };
     elements.closeShare.onclick = function () { elements.shareDialog.close(); };
+    elements.closePlayer.onclick = function () {
+      elements.playerContainer.innerHTML = '';
+      elements.playerDialog.close();
+    };
     elements.openFile.onclick = function () {
-      if (state.detail) window.open(fileUrl(state.detail.path, false), '_blank', 'noopener');
+      if (!state.detail) return;
+      if (getMediaType(state.detail.path)) {
+        openPlayer(state.detail.path);
+      } else {
+        window.open(fileUrl(state.detail.path, false), '_blank', 'noopener');
+      }
     };
     elements.downloadFile.onclick = function () {
       if (state.detail) window.open(fileUrl(state.detail.path, true), '_blank', 'noopener');

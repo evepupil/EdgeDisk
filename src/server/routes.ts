@@ -21,7 +21,7 @@ export async function routeRequest(request: Request, env: Env): Promise<Response
     const shareCode = parts[0]
     const action = parts[1] || ''
     if (!shareCode || action !== 'file') throw new HttpError(404, '路由不存在')
-    return streamSharedObject(env, shareCode, url.searchParams.get('path'), url.searchParams.get('download') === '1')
+    return streamSharedObject(env, shareCode, url.searchParams.get('path'), url.searchParams.get('download') === '1', request)
   }
 
   throw new HttpError(404, '路由不存在')

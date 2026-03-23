@@ -113,6 +113,17 @@ export function DashboardPage(props: DashboardPageProps) {
           <div class="share-list" id="shareList"></div>
         </div>
       </dialog>
+
+      <dialog id="playerDialog">
+        <div class="modal-head"><h2 id="playerTitle">媒体播放</h2></div>
+        <div class="modal-body">
+          <div class="player-container" id="playerContainer"></div>
+          <div class="actions">
+            <a class="btn primary" id="playerDownload" download>下载</a>
+            <button class="btn" id="closePlayer">关闭</button>
+          </div>
+        </div>
+      </dialog>
     </div>
   )
 }
