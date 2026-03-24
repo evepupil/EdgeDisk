@@ -126,11 +126,11 @@ export function DashboardPage(props: DashboardPageProps) {
       </dialog>
 
       <dialog id="importTaskDialog">
-        <div class="modal-head"><h2>??????</h2></div>
+        <div class="modal-head"><h2>导入任务详情</h2></div>
         <div class="modal-body">
           <div class="stack" id="importTaskBody"></div>
           <div class="actions">
-            <button class="btn" id="closeImportTask">??</button>
+            <button class="btn" id="closeImportTask">关闭</button>
           </div>
         </div>
       </dialog>

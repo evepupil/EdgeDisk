@@ -288,21 +288,21 @@ const viewStorageKey = 'edgedisk:view-mode';
     function renderImportTasks(tasks) {
       state.importTasks = tasks;
       if (!tasks.length) {
-        elements.importTasks.innerHTML = '<div class="empty">??????</div>';
+        elements.importTasks.innerHTML = '<div class="empty">暂无导入任务</div>';
         return;
       }
 
       const html = [];
       for (const task of tasks) {
         const title = task.resolvedFileName || task.requestedFileName || task.targetPath || task.sourceUrl;
-        const target = task.targetPath || ((task.directory ? '/' + task.directory : '/') + (task.requestedFileName || '????'));
+        const target = task.targetPath || ((task.directory ? '/' + task.directory : '/') + (task.requestedFileName || '自动命名'));
         const meta = [
-          '???' + target,
-          '???' + numberFormat.format(task.attempts),
-          '?????' + formatTime(task.updatedAt)
+          '目标：' + target,
+          '尝试：' + numberFormat.format(task.attempts),
+          '更新时间：' + formatTime(task.updatedAt)
         ];
-        if (task.contentLength != null) meta.push('???' + formatBytes(task.contentLength));
-        if (task.contentType) meta.push('MIME?' + task.contentType);
+        if (task.contentLength != null) meta.push('大小：' + formatBytes(task.contentLength));
+        if (task.contentType) meta.push('MIME：' + task.contentType);
 
         html.push(
           '<div class="task-item">' +
@@ -324,26 +324,26 @@ const viewStorageKey = 'edgedisk:view-mode';
       const task = state.importTasks.find(function (item) { return item.id === taskId; });
       if (!task) return;
       const title = task.resolvedFileName || task.requestedFileName || task.targetPath || task.sourceUrl;
-      const target = task.targetPath || ((task.directory ? '/' + task.directory : '/') + (task.requestedFileName || '????'));
+      const target = task.targetPath || ((task.directory ? '/' + task.directory : '/') + (task.requestedFileName || '自动命名'));
       const items = [
-        ['?? ID', task.id],
-        ['??', title],
-        ['??', taskLabels[task.status] || task.status],
-        ['???', task.sourceUrl],
-        ['????', target],
-        ['????', task.directory || '/'],
-        ['?????', task.requestedFileName || '-'],
-        ['?????', task.resolvedFileName || '-'],
-        ['????', task.overwrite ? '?' : '?'],
-        ['????', numberFormat.format(task.attempts)],
-        ['???', task.requestedBy || '-'],
-        ['??', task.contentLength == null ? '-' : formatBytes(task.contentLength)],
+        ['任务 ID', task.id],
+        ['标题', title],
+        ['状态', taskLabels[task.status] || task.status],
+        ['源地址', task.sourceUrl],
+        ['目标路径', target],
+        ['目标目录', task.directory || '/'],
+        ['请求文件名', task.requestedFileName || '-'],
+        ['解析文件名', task.resolvedFileName || '-'],
+        ['覆盖同名', task.overwrite ? '是' : '否'],
+        ['尝试次数', numberFormat.format(task.attempts)],
+        ['请求人', task.requestedBy || '-'],
+        ['大小', task.contentLength == null ? '-' : formatBytes(task.contentLength)],
         ['MIME', task.contentType || '-'],
-        ['????', formatTime(task.createdAt)],
-        ['????', formatTime(task.startedAt)],
-        ['????', formatTime(task.finishedAt)],
-        ['????', formatTime(task.updatedAt)],
-        ['????', task.error || '-']
+        ['创建时间', formatTime(task.createdAt)],
+        ['开始时间', formatTime(task.startedAt)],
+        ['完成时间', formatTime(task.finishedAt)],
+        ['更新时间', formatTime(task.updatedAt)],
+        ['错误信息', task.error || '-']
       ];
       elements.importTaskBody.innerHTML = items.map(function (item) {
         return '<div class="info"><div class="muted">' + escapeHtml(item[0]) + '</div><div class="mono" title="' + escapeHtml(String(item[1])) + '">' + escapeHtml(String(item[1])) + '</div></div>';
