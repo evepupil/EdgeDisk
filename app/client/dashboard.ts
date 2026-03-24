@@ -207,7 +207,7 @@ const viewStorageKey = 'edgedisk:view-mode';
       for (const folder of data.folders) {
         html.push(
           '<tr class="row" data-kind="folder" data-path="' + escapeHtml(folder.path) + '">' +
-            '<td class="name">📁 ' + escapeHtml(folder.name) + '</td>' +
+            '<td class="name"><span class="name-text">📁 ' + escapeHtml(folder.name) + '</span></td>' +
             '<td>文件夹</td><td>-</td><td>-</td><td>-</td>' +
             '<td><div class="row-actions">' +
               actionButton('进入', 'enter') +
@@ -224,7 +224,7 @@ const viewStorageKey = 'edgedisk:view-mode';
         const playBtn = mediaType ? actionButton('播放', 'play') : '';
         html.push(
           '<tr class="row" data-kind="file" data-path="' + escapeHtml(file.path) + '">' +
-            '<td class="name">' + icon + ' ' + escapeHtml(file.name) + '</td>' +
+            '<td class="name"><span class="name-text">' + icon + ' ' + escapeHtml(file.name) + '</span></td>' +
             '<td>文件</td>' +
             '<td>' + formatBytes(file.size) + '</td>' +
             '<td>' + escapeHtml(formatTime(file.uploaded)) + '</td>' +
