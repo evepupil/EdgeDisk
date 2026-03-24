@@ -1,4 +1,5 @@
 import { HttpError } from "./errors.ts";
+import { buildContentDisposition, inferContentType } from "./file-http.ts";
 import { baseName, joinPath, sanitizePath, toPositiveInteger } from "./path.ts";
 import type { Env } from "./types.ts";
 
@@ -51,6 +52,7 @@ export async function importFromUrl(env: Env, input: ImportInput) {
 
   const resolvedFileName = pickFileName(input.fileName, response.headers.get("content-disposition"), url);
   const targetKey = joinPath(input.directory, resolvedFileName);
+  const resolvedContentType = inferContentType(response.headers.get("content-type"), resolvedFileName);
 
   if (!input.overwrite && (await env.DISK.head(targetKey))) {
     throw new HttpError(409, "目标文件已存在，请改名或启用覆盖");
@@ -63,8 +65,8 @@ export async function importFromUrl(env: Env, input: ImportInput) {
       pipePromise,
       env.DISK.put(targetKey, readable, {
         httpMetadata: {
-          contentType: response.headers.get("content-type") || undefined,
-          contentDisposition: response.headers.get("content-disposition") || undefined
+          contentType: resolvedContentType,
+          contentDisposition: buildContentDisposition("attachment", resolvedFileName)
         },
         customMetadata: {
           sourceUrl: url.toString(),
@@ -82,7 +84,7 @@ export async function importFromUrl(env: Env, input: ImportInput) {
     path: targetKey,
     fileName: resolvedFileName,
     size: contentLength,
-    contentType: response.headers.get("content-type") || null,
+    contentType: resolvedContentType || null,
     sourceUrl: url.toString()
   };
 }

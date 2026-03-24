@@ -1,4 +1,5 @@
 import { HttpError } from "./errors.ts";
+import { applyDownloadHeaders, inferContentType } from "./file-http.ts";
 import { baseName, joinPath, normalizeRelativeFilePath, toPositiveInteger } from "./path.ts";
 import type { Env, ListedFile, ListedFolder } from "./types.ts";
 
@@ -65,7 +66,7 @@ export async function handleUpload(formData: FormData, env: Env, basePath: strin
     if (!file || typeof file !== "object" || typeof (file as Blob).stream !== "function") continue;
     const upload = file as File;
     const key = joinPath(basePath, normalizeRelativeFilePath(paths[index] || upload.name));
-    await env.DISK.put(key, upload.stream(), { httpMetadata: { contentType: upload.type || undefined } });
+    await env.DISK.put(key, upload.stream(), { httpMetadata: { contentType: inferContentType(upload.type, key) } });
     uploaded += 1;
   }
   return { uploaded };
@@ -187,7 +188,7 @@ function objectToRangeResponse(object: R2ObjectBody, fileName: string, download:
   headers.set("content-range", `bytes ${range.start}-${range.end}/${totalSize}`);
   headers.set("content-length", String(range.end - range.start + 1));
   headers.set("cache-control", "private, max-age=0, no-store");
-  headers.set("content-disposition", `${download ? "attachment" : "inline"}; filename*=UTF-8''${encodeURIComponent(fileName)}`);
+  applyDownloadHeaders(headers, download ? "attachment" : "inline", fileName, object.httpMetadata?.contentType);
   return new Response(object.body, { status: 206, headers });
 }
 
@@ -233,6 +234,6 @@ export function objectToResponse(object: R2ObjectBody, fileName: string, downloa
   headers.set("etag", object.httpEtag || object.etag);
   headers.set("accept-ranges", "bytes");
   headers.set("cache-control", "private, max-age=0, no-store");
-  headers.set("content-disposition", `${download ? "attachment" : "inline"}; filename*=UTF-8''${encodeURIComponent(fileName)}`);
+  applyDownloadHeaders(headers, download ? "attachment" : "inline", fileName, object.httpMetadata?.contentType);
   return new Response(object.body, { headers });
 }
