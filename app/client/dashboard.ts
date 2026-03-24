@@ -7,6 +7,7 @@ const viewStorageKey = 'edgedisk:view-mode';
       session: null,
       detail: null,
       share: null,
+      importTasks: [],
       viewMode: localStorage.getItem(viewStorageKey) || 'table'
     };
 
@@ -51,7 +52,10 @@ const viewStorageKey = 'edgedisk:view-mode';
       playerTitle: document.getElementById('playerTitle'),
       playerContainer: document.getElementById('playerContainer'),
       playerDownload: document.getElementById('playerDownload'),
-      closePlayer: document.getElementById('closePlayer')
+      closePlayer: document.getElementById('closePlayer'),
+      importTaskDialog: document.getElementById('importTaskDialog'),
+      importTaskBody: document.getElementById('importTaskBody'),
+      closeImportTask: document.getElementById('closeImportTask')
     };
 
     const numberFormat = new Intl.NumberFormat('zh-CN');
@@ -282,35 +286,69 @@ const viewStorageKey = 'edgedisk:view-mode';
     }
 
     function renderImportTasks(tasks) {
+      state.importTasks = tasks;
       if (!tasks.length) {
-        elements.importTasks.innerHTML = '<div class="empty">暂无导入任务</div>';
+        elements.importTasks.innerHTML = '<div class="empty">??????</div>';
         return;
       }
 
       const html = [];
       for (const task of tasks) {
         const title = task.resolvedFileName || task.requestedFileName || task.targetPath || task.sourceUrl;
-        const target = task.targetPath || ((task.directory ? '/' + task.directory : '/') + (task.requestedFileName || '自动命名'));
+        const target = task.targetPath || ((task.directory ? '/' + task.directory : '/') + (task.requestedFileName || '????'));
         const meta = [
-          '目标：' + target,
-          '尝试：' + numberFormat.format(task.attempts),
-          '更新时间：' + formatTime(task.updatedAt)
+          '???' + target,
+          '???' + numberFormat.format(task.attempts),
+          '?????' + formatTime(task.updatedAt)
         ];
-        if (task.contentLength != null) meta.push('大小：' + formatBytes(task.contentLength));
-        if (task.contentType) meta.push('MIME：' + task.contentType);
+        if (task.contentLength != null) meta.push('???' + formatBytes(task.contentLength));
+        if (task.contentType) meta.push('MIME?' + task.contentType);
 
         html.push(
           '<div class="task-item">' +
             '<div class="task-item-head">' +
-              '<strong class="task-title">' + escapeHtml(title) + '</strong>' +
+              '<button class="task-title-btn" type="button" data-task-id="' + escapeHtml(task.id) + '" title="' + escapeHtml(title) + '">' +
+                '<strong class="task-title">' + escapeHtml(title) + '</strong>' +
+              '</button>' +
               '<span class="task-badge ' + escapeHtml(task.status === 'succeeded' ? 'success' : task.status === 'failed' ? 'error' : task.status === 'running' ? 'running' : 'queued') + '">' + escapeHtml(taskLabels[task.status] || task.status) + '</span>' +
             '</div>' +
-            '<div class="task-meta">' + meta.map(function (line) { return '<div>' + escapeHtml(line) + '</div>'; }).join('') + '</div>' +
-            (task.error ? '<div class="task-error">' + escapeHtml(task.error) + '</div>' : '') +
+            '<div class="task-meta">' + meta.map(function (line) { return '<div title="' + escapeHtml(line) + '">' + escapeHtml(line) + '</div>'; }).join('') + '</div>' +
+            (task.error ? '<div class="task-error" title="' + escapeHtml(task.error) + '">' + escapeHtml(task.error) + '</div>' : '') +
           '</div>'
         );
       }
       elements.importTasks.innerHTML = html.join('');
+    }
+
+    function showImportTask(taskId) {
+      const task = state.importTasks.find(function (item) { return item.id === taskId; });
+      if (!task) return;
+      const title = task.resolvedFileName || task.requestedFileName || task.targetPath || task.sourceUrl;
+      const target = task.targetPath || ((task.directory ? '/' + task.directory : '/') + (task.requestedFileName || '????'));
+      const items = [
+        ['?? ID', task.id],
+        ['??', title],
+        ['??', taskLabels[task.status] || task.status],
+        ['???', task.sourceUrl],
+        ['????', target],
+        ['????', task.directory || '/'],
+        ['?????', task.requestedFileName || '-'],
+        ['?????', task.resolvedFileName || '-'],
+        ['????', task.overwrite ? '?' : '?'],
+        ['????', numberFormat.format(task.attempts)],
+        ['???', task.requestedBy || '-'],
+        ['??', task.contentLength == null ? '-' : formatBytes(task.contentLength)],
+        ['MIME', task.contentType || '-'],
+        ['????', formatTime(task.createdAt)],
+        ['????', formatTime(task.startedAt)],
+        ['????', formatTime(task.finishedAt)],
+        ['????', formatTime(task.updatedAt)],
+        ['????', task.error || '-']
+      ];
+      elements.importTaskBody.innerHTML = items.map(function (item) {
+        return '<div class="info"><div class="muted">' + escapeHtml(item[0]) + '</div><div class="mono" title="' + escapeHtml(String(item[1])) + '">' + escapeHtml(String(item[1])) + '</div></div>';
+      }).join('');
+      elements.importTaskDialog.showModal();
     }
 
     async function loadImportTasks(silent) {
@@ -519,6 +557,11 @@ const viewStorageKey = 'edgedisk:view-mode';
     elements.refreshImports.onclick = function () {
       void loadImportTasks(false).catch(function () { return null; });
     };
+    elements.importTasks.onclick = function (event) {
+      const button = event.target.closest('[data-task-id]');
+      if (!button) return;
+      showImportTask(button.dataset.taskId);
+    };
     elements.tableViewButton.onclick = function () { setViewMode('table'); };
     elements.iconViewButton.onclick = function () { setViewMode('icon'); };
     elements.closeDetail.onclick = function () { elements.detailDialog.close(); };
@@ -526,6 +569,9 @@ const viewStorageKey = 'edgedisk:view-mode';
     elements.closePlayer.onclick = function () {
       elements.playerContainer.innerHTML = '';
       elements.playerDialog.close();
+    };
+    elements.closeImportTask.onclick = function () {
+      elements.importTaskDialog.close();
     };
     elements.openFile.onclick = function () {
       if (!state.detail) return;
