@@ -11,7 +11,7 @@ export function SharePage(props: SharePageProps) {
           <h1>{props.appName} 分享</h1>
           <p>浏览公开分享的文件或文件夹，并按需下载。</p>
         </div>
-        <div class="actions"><a class="btn" href="/app">进入后台</a></div>
+        <div class="actions"><button class="btn" id="themeToggle" type="button">{'\u5207\u6362\u4E3B\u9898'}</button><a class="btn" href="/app">{'\u8FDB\u5165\u540E\u53F0'}</a></div>
       </section>
       <section class="card" style="margin-top:16px">
         <div class="card-head">

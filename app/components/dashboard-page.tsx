@@ -12,6 +12,7 @@ export function DashboardPage(props: DashboardPageProps) {
         </div>
         <div class="actions">
           <span class="badge" id="who">正在验证身份…</span>
+          <button class="btn" id="themeToggle" type="button">{'\u5207\u6362\u4E3B\u9898'}</button>
           <button class="btn" id="refresh">刷新</button>
         </div>
       </section>

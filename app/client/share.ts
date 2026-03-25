@@ -4,15 +4,19 @@ export {}
 const root = document.getElementById('share-page')
 if (!root) throw new Error('share page root missing')
 
+const themeStorageKey = 'edgedisk:theme'
+
 const state = {
   code: root.dataset.shareCode || '',
   sub: '',
   selected: new Set(),
-  mode: 'folder'
+  mode: 'folder',
+  theme: document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark'
 }
 
 const e = {
   crumbs: document.getElementById('crumbs'),
+  themeToggle: document.getElementById('themeToggle'),
   refresh: document.getElementById('refresh'),
   downloadSelected: document.getElementById('downloadSelected'),
   status: document.getElementById('status'),
@@ -45,6 +49,24 @@ const trimSlash = (value) => {
 const setStatus = (text, kind = '') => {
   e.status.textContent = text
   e.status.className = kind ? 'status ' + kind : 'status'
+}
+
+const renderThemeToggle = () => {
+  if (!e.themeToggle) return
+  const isLight = state.theme === 'light'
+  e.themeToggle.textContent = isLight ? '\uD83C\uDF19 \u6697\u8272' : '\u2600\uFE0F \u4EAE\u8272'
+  e.themeToggle.title = isLight ? '\u5207\u6362\u5230\u6697\u8272\u4E3B\u9898' : '\u5207\u6362\u5230\u4EAE\u8272\u4E3B\u9898'
+}
+
+const applyTheme = (nextTheme, persist = false) => {
+  state.theme = nextTheme === 'light' ? 'light' : 'dark'
+  document.documentElement.setAttribute('data-theme', state.theme)
+  if (persist) localStorage.setItem(themeStorageKey, state.theme)
+  renderThemeToggle()
+}
+
+const toggleTheme = () => {
+  applyTheme(state.theme === 'light' ? 'dark' : 'light', true)
 }
 const api = async (url) => {
   const response = await fetch(url)
@@ -212,6 +234,10 @@ async function load(sub = state.sub) {
     setStatus(error.message || '分享加载失败', 'error')
   }
 }
+
+if (e.themeToggle) e.themeToggle.onclick = () => toggleTheme()
+
+applyTheme(state.theme, false)
 
 e.refresh.onclick = () => load(state.sub)
 e.downloadSelected.onclick = () => {

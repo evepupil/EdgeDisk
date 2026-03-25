@@ -2,17 +2,20 @@
 export {}
 
 const viewStorageKey = 'edgedisk:view-mode';
+const themeStorageKey = 'edgedisk:theme';
     const state = {
       prefix: '',
       session: null,
       detail: null,
       share: null,
       importTasks: [],
+      theme: document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark',
       viewMode: localStorage.getItem(viewStorageKey) || 'table'
     };
 
     const elements = {
       who: document.getElementById('who'),
+      themeToggle: document.getElementById('themeToggle'),
       refresh: document.getElementById('refresh'),
       crumbs: document.getElementById('crumbs'),
       rows: document.getElementById('rows'),
@@ -113,6 +116,25 @@ const viewStorageKey = 'edgedisk:view-mode';
     function setStatus(text, kind) {
       elements.status.textContent = text;
       elements.status.className = kind ? 'status ' + kind : 'status';
+    }
+
+    function renderThemeToggle() {
+      if (!elements.themeToggle) return;
+      const isLight = state.theme === 'light';
+      elements.themeToggle.textContent = isLight ? '\uD83C\uDF19 \u6697\u8272' : '\u2600\uFE0F \u4EAE\u8272';
+      elements.themeToggle.title = isLight ? '\u5207\u6362\u5230\u6697\u8272\u4E3B\u9898' : '\u5207\u6362\u5230\u4EAE\u8272\u4E3B\u9898';
+      elements.themeToggle.setAttribute('aria-label', elements.themeToggle.title);
+    }
+
+    function applyTheme(nextTheme, persist) {
+      state.theme = nextTheme === 'light' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', state.theme);
+      if (persist) localStorage.setItem(themeStorageKey, state.theme);
+      renderThemeToggle();
+    }
+
+    function toggleTheme() {
+      applyTheme(state.theme === 'light' ? 'dark' : 'light', true);
     }
 
     async function api(url, options) {
@@ -545,6 +567,10 @@ const viewStorageKey = 'edgedisk:view-mode';
       if (action === 'delete') { void deleteTarget(item).catch(function (error) { setStatus(error.message || '删除失败', 'error'); }); }
     }
 
+    if (elements.themeToggle) {
+      elements.themeToggle.onclick = function () { toggleTheme(); };
+    }
+
     elements.refresh.onclick = function () {
       void Promise.all([load(state.prefix), loadImportTasks(true).catch(function () { return null; })]);
     };
@@ -676,6 +702,7 @@ const viewStorageKey = 'edgedisk:view-mode';
       void revokeShare(button.dataset.revoke).catch(function (error) { setStatus(error.message || '撤销分享失败', 'error'); });
     });
 
+    applyTheme(state.theme, false);
     setViewMode(state.viewMode === 'icon' ? 'icon' : 'table');
     window.setInterval(function () {
       void loadImportTasks(true).catch(function () { return null; });
