@@ -155,12 +155,23 @@ function parseContentLength(header: string | null): number | null {
 }
 
 function pickFileName(explicitFileName: string | undefined, contentDisposition: string | null, url: URL): string {
-  const candidates = [explicitFileName || "", parseContentDispositionFileName(contentDisposition), baseName(url.pathname), `download-${Date.now()}`];
+  const candidates = [
+    explicitFileName || "",
+    parseContentDispositionFileName(contentDisposition),
+    decodeUrlPathFileName(url.pathname),
+    baseName(url.pathname),
+    `download-${Date.now()}`
+  ];
   for (const candidate of candidates) {
-    const safeName = sanitizeFileName(candidate);
+    const safeName = sanitizeFileName(decodeFileNameCandidate(candidate));
     if (safeName) return safeName;
   }
   return `download-${Date.now()}`;
+}
+
+function decodeUrlPathFileName(pathname: string): string {
+  const rawName = baseName(pathname);
+  return decodeFileNameCandidate(rawName);
 }
 
 function parseContentDispositionFileName(header: string | null): string {
@@ -180,6 +191,16 @@ function parseContentDispositionFileName(header: string | null): string {
 function sanitizeFileName(input: string): string {
   const normalized = sanitizePath(input).replaceAll("/", "-").trim();
   return normalized.replace(/[<>:"|?*]/g, "-").slice(0, 220);
+}
+
+function decodeFileNameCandidate(input: string): string {
+  const value = String(input || '').trim();
+  if (!value || !/%[0-9A-Fa-f]{2}/.test(value)) return value;
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
 }
 
 function formatBytes(size: number): string {
