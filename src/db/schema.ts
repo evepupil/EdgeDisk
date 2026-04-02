@@ -20,5 +20,19 @@ export const importTasks = sqliteTable("import_tasks", {
   finishedAt: text("finished_at")
 });
 
+export const trashItems = sqliteTable("trash_items", {
+  id: text("id").primaryKey(),
+  kind: text("kind", { enum: ["file", "folder"] }).notNull(),
+  originalPath: text("original_path").notNull(),
+  storagePrefix: text("storage_prefix").notNull(),
+  deletedBy: text("deleted_by").notNull(),
+  deletedAt: text("deleted_at").notNull(),
+  itemCount: integer("item_count").notNull().default(0),
+  totalSize: integer("total_size").notNull().default(0),
+  contentType: text("content_type")
+});
+
 export type ImportTaskRow = typeof importTasks.$inferSelect;
 export type NewImportTaskRow = typeof importTasks.$inferInsert;
+export type TrashItemRow = typeof trashItems.$inferSelect;
+export type NewTrashItemRow = typeof trashItems.$inferInsert;

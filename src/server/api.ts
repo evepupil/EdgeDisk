@@ -1,33 +1,36 @@
-﻿import { zValidator } from '@hono/zod-validator'
+import { zValidator } from '@hono/zod-validator'
 import { Hono } from 'hono'
 import { z } from 'zod'
 import { requireAdmin } from './auth'
 import { HttpError, respondError } from './errors'
 import { createImportTask, listImportTasks } from './services/import-service.ts'
-import { createFolder, deleteObject, getObjectDetail, handleUpload, listDirectory, moveObject, streamObject } from './objects'
+import { createFolder, getObjectDetail, handleUpload, listDirectory, moveObject, streamObject } from './objects'
 import { normalizeAnyPath, normalizeDirectoryPath, normalizeFilePath, parseOptionalNonNegativeNumber } from './path'
 import { createShare, listSharesByTarget, retargetSharesForMove, revokeShare, revokeSharesForPath } from './shares'
+import { listTrashItems, moveToTrash, permanentlyDeleteTrashItem, restoreTrashItem } from './trash'
 import type { Env, SessionInfo } from './types'
 
-const pathQuerySchema = z.object({ path: z.string().trim().min(1, '缺少 path 参数') })
+const pathQuerySchema = z.object({ path: z.string().trim().min(1, '\u7f3a\u5c11 path \u53c2\u6570') })
 const listQuerySchema = z.object({ prefix: z.string().optional() })
 const importTaskQuerySchema = z.object({ limit: z.string().optional() })
-const fileQuerySchema = z.object({ path: z.string().trim().min(1, '缺少 path 参数'), download: z.string().optional() })
-const folderSchema = z.object({ path: z.string().trim().min(1, '缺少 path 参数') })
+const trashQuerySchema = z.object({ limit: z.string().optional() })
+const fileQuerySchema = z.object({ path: z.string().trim().min(1, '\u7f3a\u5c11 path \u53c2\u6570'), download: z.string().optional() })
+const folderSchema = z.object({ path: z.string().trim().min(1, '\u7f3a\u5c11 path \u53c2\u6570') })
 const moveSchema = z.object({
   kind: z.enum(['file', 'folder']),
-  path: z.string().trim().min(1, '缺少移动参数'),
-  targetPath: z.string().trim().min(1, '缺少移动参数')
+  path: z.string().trim().min(1, '\u7f3a\u5c11\u79fb\u52a8\u53c2\u6570'),
+  targetPath: z.string().trim().min(1, '\u7f3a\u5c11\u79fb\u52a8\u53c2\u6570')
 })
+const trashActionSchema = z.object({ itemId: z.string().trim().min(1, '\u7f3a\u5c11\u56de\u6536\u7ad9\u6761\u76ee ID') })
 const shareCreateSchema = z.object({
   kind: z.enum(['file', 'folder']),
-  path: z.string().trim().min(1, '分享参数不完整'),
+  path: z.string().trim().min(1, '\u5206\u4eab\u53c2\u6570\u4e0d\u5b8c\u6574'),
   expiresInDays: z.union([z.number(), z.string()]).optional().nullable()
 })
-const shareDeleteSchema = z.object({ code: z.string().trim().min(1, '缺少分享码') })
+const shareDeleteSchema = z.object({ code: z.string().trim().min(1, '\u7f3a\u5c11\u5206\u4eab\u7801') })
 const sharesQuerySchema = z.object({
   kind: z.enum(['file', 'folder']),
-  path: z.string().trim().min(1, '缺少 path 参数')
+  path: z.string().trim().min(1, '\u7f3a\u5c11 path \u53c2\u6570')
 })
 
 type ApiEnv = {
@@ -54,6 +57,23 @@ api.get('/list', zValidator('query', listQuerySchema), async (c) => {
   return c.json(await listDirectory(c.env, normalizeDirectoryPath(query.prefix || '')))
 })
 
+api.get('/trash', zValidator('query', trashQuerySchema), async (c) => {
+  const query = c.req.valid('query')
+  const limit = query.limit ? Number.parseInt(query.limit, 10) : null
+  return c.json({ items: await listTrashItems(c.env, Number.isFinite(limit) ? limit : null) })
+})
+
+api.post('/trash/restore', zValidator('json', trashActionSchema), async (c) => {
+  const session = c.get('session')
+  const payload = c.req.valid('json')
+  return c.json(await restoreTrashItem(c.env, payload.itemId))
+})
+
+api.delete('/trash', zValidator('query', trashActionSchema), async (c) => {
+  const query = c.req.valid('query')
+  return c.json(await permanentlyDeleteTrashItem(c.env, query.itemId))
+})
+
 api.get('/import-tasks', zValidator('query', importTaskQuerySchema), async (c) => {
   const query = c.req.valid('query')
   return c.json({ tasks: await listImportTasks(c.env, query.limit || null) })
@@ -65,9 +85,10 @@ api.get('/object', zValidator('query', pathQuerySchema), async (c) => {
 })
 
 api.delete('/object', zValidator('query', pathQuerySchema), async (c) => {
+  const session = c.get('session')
   const query = c.req.valid('query')
   const targetPath = normalizeAnyPath(query.path)
-  const result = await deleteObject(c.env, targetPath)
+  const result = await moveToTrash(c.env, targetPath, session.email)
   const revokedShares = await revokeSharesForPath(c.env, targetPath, targetPath.endsWith('/'))
   return c.json({ ...result, revokedShares })
 })
@@ -115,7 +136,7 @@ api.post('/share', zValidator('json', shareCreateSchema), async (c) => {
 api.delete('/share', zValidator('query', shareDeleteSchema), async (c) => {
   const query = c.req.valid('query')
   const revoked = await revokeShare(c.env, query.code)
-  if (!revoked) throw new HttpError(404, '分享不存在或已失效')
+  if (!revoked) throw new HttpError(404, '\u5206\u4eab\u4e0d\u5b58\u5728\u6216\u5df2\u5931\u6548')
   return c.json({ revoked: true, code: query.code })
 })
 
@@ -127,4 +148,3 @@ api.get('/shares', zValidator('query', sharesQuerySchema), async (c) => {
 })
 
 export default api
-

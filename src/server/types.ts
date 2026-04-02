@@ -62,3 +62,15 @@ export type ImportTask = {
   startedAt: string | null;
   finishedAt: string | null;
 };
+
+export type TrashItem = {
+  id: string;
+  kind: "file" | "folder";
+  originalPath: string;
+  storagePrefix: string;
+  deletedBy: string;
+  deletedAt: string;
+  itemCount: number;
+  totalSize: number;
+  contentType: string | null;
+};

@@ -27,6 +27,7 @@ export function DashboardPage(props: DashboardPageProps) {
             <div class="toolbar">
               <button class="btn" id="newFolderButton">新建文件夹</button>
               <button class="btn" id="importUrlButton">URL 导入</button>
+              <button class="btn" id="trashButton">{'\u56de\u6536\u7ad9'}</button>
               <button class="btn active" id="tableViewButton">列表视图</button>
               <button class="btn" id="iconViewButton">图标视图</button>
               <label class="pick primary">上传文件<input id="pickFiles" type="file" multiple /></label>
@@ -122,6 +123,20 @@ export function DashboardPage(props: DashboardPageProps) {
           <div class="actions">
             <a class="btn primary" id="playerDownload" download>下载</a>
             <button class="btn" id="closePlayer">关闭</button>
+          </div>
+        </div>
+      </dialog>
+
+      <dialog id="trashDialog">
+        <div class="modal-head"><h2>{'\u56de\u6536\u7ad9'}</h2></div>
+        <div class="modal-body">
+          <div class="toolbar" style="justify-content:space-between;margin-bottom:12px">
+            <div class="muted">{'\u5220\u9664\u540e\u7684\u6587\u4ef6\u4f1a\u5148\u4fdd\u5b58\u5728\u8fd9\u91cc\uff0c\u53ef\u6062\u590d\u6216\u5f7b\u5e95\u5220\u9664\u3002'}</div>
+            <button class="btn small" id="refreshTrash">{'\u5237\u65b0'}</button>
+          </div>
+          <div class="task-list" id="trashList"><div class="empty">{'\u56de\u6536\u7ad9\u4e3a\u7a7a'}</div></div>
+          <div class="actions">
+            <button class="btn" id="closeTrash">{'\u5173\u95ed'}</button>
           </div>
         </div>
       </dialog>

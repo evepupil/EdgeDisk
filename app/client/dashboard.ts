@@ -9,6 +9,7 @@ const themeStorageKey = 'edgedisk:theme';
       detail: null,
       share: null,
       importTasks: [],
+      trashItems: [],
       theme: document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark',
       viewMode: localStorage.getItem(viewStorageKey) || 'table'
     };
@@ -30,6 +31,7 @@ const themeStorageKey = 'edgedisk:theme';
       dropzone: document.getElementById('dropzone'),
       newFolderButton: document.getElementById('newFolderButton'),
       importUrlButton: document.getElementById('importUrlButton'),
+      trashButton: document.getElementById('trashButton'),
       tableViewButton: document.getElementById('tableViewButton'),
       iconViewButton: document.getElementById('iconViewButton'),
       refreshImports: document.getElementById('refreshImports'),
@@ -58,7 +60,11 @@ const themeStorageKey = 'edgedisk:theme';
       closePlayer: document.getElementById('closePlayer'),
       importTaskDialog: document.getElementById('importTaskDialog'),
       importTaskBody: document.getElementById('importTaskBody'),
-      closeImportTask: document.getElementById('closeImportTask')
+      closeImportTask: document.getElementById('closeImportTask'),
+      trashDialog: document.getElementById('trashDialog'),
+      trashList: document.getElementById('trashList'),
+      refreshTrash: document.getElementById('refreshTrash'),
+      closeTrash: document.getElementById('closeTrash')
     };
 
     const numberFormat = new Intl.NumberFormat('zh-CN');
@@ -378,10 +384,73 @@ const themeStorageKey = 'edgedisk:theme';
         const data = await api('/api/import-tasks?limit=8');
         renderImportTasks(data.tasks || []);
       } catch (error) {
-        elements.importTasks.innerHTML = '<div class="info">' + escapeHtml(error.message || '加载导入任务失败') + '</div>';
-        if (!silent) setStatus(error.message || '加载导入任务失败', 'error');
+        elements.importTasks.innerHTML = '<div class="info">' + escapeHtml(error.message || '\u52a0\u8f7d\u5bfc\u5165\u4efb\u52a1\u5931\u8d25') + '</div>';
+        if (!silent) setStatus(error.message || '\u52a0\u8f7d\u5bfc\u5165\u4efb\u52a1\u5931\u8d25', 'error');
         throw error;
       }
+    }
+
+    function renderTrashItems(items) {
+      state.trashItems = items;
+      if (!items.length) {
+        elements.trashList.innerHTML = '<div class="empty">\u56de\u6536\u7ad9\u4e3a\u7a7a</div>';
+        return;
+      }
+
+      const html = [];
+      for (const item of items) {
+        const title = item.originalPath.split('/').filter(Boolean).pop() || item.originalPath;
+        const meta = [
+          '\u539f\u8def\u5f84\uff1a' + item.originalPath,
+          '\u56de\u6536\u7ad9\u4e3a\u7a7a' + formatTime(item.deletedAt),
+          '\u5220\u9664\u4eba\uff1a' + item.deletedBy,
+          item.kind === 'folder' ? '\u56de\u6536\u7ad9\u4e3a\u7a7a' + numberFormat.format(item.itemCount) : 'MIME\uff1a' + (item.contentType || '-'),
+          '\u5927\u5c0f\uff1a' + formatBytes(item.totalSize)
+        ];
+        html.push(
+          '<div class="task-item">' +
+            '<div class="task-item-head">' +
+              '<div class="task-title" title="' + escapeHtml(item.originalPath) + '">' + escapeHtml(title) + '</div>' +
+              '<span class="task-badge error">' + (item.kind === 'folder' ? '\u6587\u4ef6\u5939' : '\u6587\u4ef6') + '</span>' +
+            '</div>' +
+            '<div class="task-meta">' + meta.map(function (line) { return '<div title="' + escapeHtml(line) + '">' + escapeHtml(line) + '</div>'; }).join('') + '</div>' +
+            '<div class="row-actions">' +
+              '<button class="btn small" type="button" data-trash-restore="' + escapeHtml(item.id) + '">\u6062\u590d</button>' +
+              '<button class="btn small danger" type="button" data-trash-delete="' + escapeHtml(item.id) + '">\u5f7b\u5e95\u5220\u9664</button>' +
+            '</div>' +
+          '</div>'
+        );
+      }
+      elements.trashList.innerHTML = html.join('');
+    }
+
+    async function loadTrash(silent) {
+      try {
+        const data = await api('/api/trash?limit=50');
+        renderTrashItems(data.items || []);
+      } catch (error) {
+        elements.trashList.innerHTML = '<div class="info">' + escapeHtml(error.message || '\u52a0\u8f7d\u56de\u6536\u7ad9\u5931\u8d25') + '</div>';
+        if (!silent) setStatus(error.message || '\u52a0\u8f7d\u56de\u6536\u7ad9\u5931\u8d25', 'error');
+        throw error;
+      }
+    }
+
+    async function restoreTrash(itemId) {
+      await api('/api/trash/restore', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ itemId: itemId })
+      });
+      setStatus('\u5df2\u4ece\u56de\u6536\u7ad9\u6062\u590d\u5bf9\u8c61', 'success');
+      await Promise.all([load(state.prefix), loadTrash(true)]);
+    }
+
+    async function deleteTrashPermanently(itemId) {
+      const ok = window.confirm('\u786e\u5b9a\u5f7b\u5e95\u5220\u9664\u8fd9\u4e2a\u56de\u6536\u7ad9\u6761\u76ee\u5417\uff1f\u6b64\u64cd\u4f5c\u4e0d\u53ef\u6062\u590d\u3002');
+      if (!ok) return;
+      await api('/api/trash?itemId=' + encodeURIComponent(itemId), { method: 'DELETE' });
+      setStatus('\u5df2\u5f7b\u5e95\u5220\u9664\u56de\u6536\u7ad9\u6761\u76ee', 'success');
+      await loadTrash(true);
     }
 
     async function showDetail(path) {
@@ -588,6 +657,17 @@ const themeStorageKey = 'edgedisk:theme';
       if (!button) return;
       showImportTask(button.dataset.taskId);
     };
+    elements.trashList.onclick = function (event) {
+      const restoreButton = event.target.closest('[data-trash-restore]');
+      if (restoreButton) {
+        void restoreTrash(restoreButton.dataset.trashRestore).catch(function (error) { setStatus(error.message || '\u6062\u590d\u5931\u8d25', 'error'); });
+        return;
+      }
+      const deleteButton = event.target.closest('[data-trash-delete]');
+      if (deleteButton) {
+        void deleteTrashPermanently(deleteButton.dataset.trashDelete).catch(function (error) { setStatus(error.message || '\u5f7b\u5e95\u5220\u9664\u5931\u8d25', 'error'); });
+      }
+    };
     elements.tableViewButton.onclick = function () { setViewMode('table'); };
     elements.iconViewButton.onclick = function () { setViewMode('icon'); };
     elements.closeDetail.onclick = function () { elements.detailDialog.close(); };
@@ -598,6 +678,12 @@ const themeStorageKey = 'edgedisk:theme';
     };
     elements.closeImportTask.onclick = function () {
       elements.importTaskDialog.close();
+    };
+    elements.refreshTrash.onclick = function () {
+      void loadTrash(false).catch(function () { return null; });
+    };
+    elements.closeTrash.onclick = function () {
+      elements.trashDialog.close();
     };
     elements.openFile.onclick = function () {
       if (!state.detail) return;

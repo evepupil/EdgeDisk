@@ -1,17 +1,20 @@
 import { HttpError } from "./errors.ts";
 import { applyDownloadHeaders, inferContentType } from "./file-http.ts";
+import { TRASH_PREFIX } from "./storage.ts";
 import { baseName, joinPath, normalizeRelativeFilePath, toPositiveInteger } from "./path.ts";
 import type { Env, ListedFile, ListedFolder } from "./types.ts";
 
 export const FOLDER_MARKER = ".__edgedisk_folder__";
 
 export async function listDirectory(env: Env, prefix: string) {
+  const trashPrefix = TRASH_PREFIX;
   const list = await env.DISK.list({ prefix, delimiter: "/", limit: toPositiveInteger(env.MAX_LIST_KEYS, 1000) });
   const folders: ListedFolder[] = (list.delimitedPrefixes || [])
+    .filter((item) => item !== trashPrefix)
     .map((item) => ({ kind: "folder" as const, name: baseName(item.slice(0, -1)), path: item }))
     .sort((a, b) => a.path.localeCompare(b.path, "zh-CN"));
   const files: ListedFile[] = list.objects
-    .filter((item) => item.key !== prefix && baseName(item.key) !== FOLDER_MARKER)
+    .filter((item) => item.key !== prefix && item.key !== trashPrefix && baseName(item.key) !== FOLDER_MARKER)
     .map((item) => ({
       kind: "file" as const,
       name: baseName(item.key),
