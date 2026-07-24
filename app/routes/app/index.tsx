@@ -1,6 +1,5 @@
 import { createRoute } from 'honox/factory'
 import { DashboardPage } from '../../components/dashboard-page'
-import dashboardScript from '../../client/dashboard.ts?raw'
 import type { Env } from '../../../src/server/types'
 
 export default createRoute(async (c) => {
@@ -9,7 +8,9 @@ export default createRoute(async (c) => {
   return c.render(
     <>
       <DashboardPage appName={appName} />
-      <script type="module" dangerouslySetInnerHTML={{ __html: dashboardScript }} />
+      {import.meta.env.PROD
+        ? <script type="module" src="/dashboard.js" />
+        : <script type="module" src="/app/client/dashboard.ts" />}
     </>
   )
 })

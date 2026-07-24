@@ -1,13 +1,17 @@
-﻿{
+{
   "name": "edgedisk",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "npm run build:client && npm run build:worker",
+    "build:client": "vite build --mode client",
+    "build:worker": "vite build",
     "deploy": "npm run build && wrangler deploy",
-    "check": "tsc --noEmit"
+    "check": "tsc --noEmit",
+    "test": "vitest run",
+    "gate": "npm run check && npm test && npm run build"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260317.1",
@@ -15,6 +19,7 @@
     "@hono/vite-dev-server": "^0.25.1",
     "typescript": "^5.9.3",
     "vite": "^7.3.1",
+    "vitest": "^4.1.10",
     "wrangler": "^4.75.0"
   },
   "dependencies": {
@@ -23,6 +28,7 @@
     "hono": "^4.10.4",
     "honox": "^0.1.55",
     "jose": "^6.2.1",
+    "lucide": "^1.26.0",
     "zod": "^4.3.6"
   }
 }
