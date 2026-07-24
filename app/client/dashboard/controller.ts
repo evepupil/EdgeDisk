@@ -2,7 +2,6 @@ import { getErrorMessage, requestJson } from '../shared/api'
 import { closestElement, closeParentDialog } from '../shared/dom'
 import { baseName, ensureFolderPath, escapeHtml, filterAndSortItems, getMediaType, normalizeInputPath, parentDirectory } from '../shared/format'
 import { iconMarkup, renderIcons } from '../shared/icons'
-import { initTheme } from '../shared/theme'
 import type { DirectoryData, ImportTask, ListedItem, ObjectDetail, ShareItem, ShareTarget, SortMode, TrashItem, ViewMode } from '../shared/types'
 import { getDashboardElements } from './elements'
 import { renderCrumbs, renderDetail, renderDirectory, renderImportTaskDetail, renderImportTasks, renderShares, renderTrashItems, updateSelectionView } from './view'
@@ -70,7 +69,7 @@ export function initDashboard(): void {
       state.directory = await requestJson<DirectoryData>(`/api/list?prefix=${encodeURIComponent(prefix)}`)
       state.selected.clear()
       refreshDirectoryView()
-      setStatus(`已加载 ${state.directory.folders.length + state.directory.files.length} 个项目`, 'success')
+      setStatus('')
     } catch (error) {
       setStatus(getErrorMessage(error, '目录加载失败'), 'error')
     }
@@ -259,7 +258,7 @@ export function initDashboard(): void {
       state.importTasks = data.tasks
       elements.importNavCount.textContent = String(data.tasks.filter((task) => task.status === 'queued' || task.status === 'running').length)
       renderImportTasks(elements.importTasks, data.tasks)
-      setStatus(`共 ${data.tasks.length} 条任务`, 'success', elements.importStatus)
+      setStatus('', '', elements.importStatus)
     } catch (error) {
       setStatus(getErrorMessage(error, '加载导入任务失败'), 'error', elements.importStatus)
     }
@@ -272,7 +271,7 @@ export function initDashboard(): void {
       state.trashItems = data.items
       elements.trashNavCount.textContent = String(data.items.length)
       renderTrashItems(elements.trashList, data.items)
-      setStatus(`共 ${data.items.length} 个项目`, 'success', elements.trashStatus)
+      setStatus('', '', elements.trashStatus)
     } catch (error) {
       setStatus(getErrorMessage(error, '加载回收站失败'), 'error', elements.trashStatus)
     }
@@ -473,7 +472,6 @@ export function initDashboard(): void {
   elements.closePermanentDelete.addEventListener('click', () => closeDialog(elements.permanentDeleteDialog))
   elements.closePlayer.addEventListener('click', () => { elements.playerContainer.replaceChildren(); closeDialog(elements.playerDialog) })
 
-  elements.themeToggle.addEventListener('click', initTheme(elements.themeToggle))
   renderIcons()
   setViewMode(state.viewMode)
   window.setInterval(() => void loadImportTasks(true), 15_000)

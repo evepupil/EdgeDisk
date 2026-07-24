@@ -2,8 +2,6 @@ export type ItemKind = 'file' | 'folder'
 export type MediaType = 'audio' | 'video' | null
 export type ViewMode = 'table' | 'icon'
 export type SortMode = 'name' | 'updated' | 'size'
-export type Theme = 'light' | 'dark'
-
 export type ListedFolder = {
   kind: 'folder'
   name: string

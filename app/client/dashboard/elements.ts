@@ -4,7 +4,6 @@ export function getDashboardElements() {
   return {
     root: requireElement<HTMLDivElement>('dashboard-page'),
     who: requireElement<HTMLElement>('who'),
-    themeToggle: requireElement<HTMLButtonElement>('themeToggle'),
     searchInput: requireElement<HTMLInputElement>('searchInput'),
     sortSelect: requireElement<HTMLSelectElement>('sortSelect'),
     crumbs: requireElement<HTMLElement>('crumbs'),

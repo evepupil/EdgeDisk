@@ -17,9 +17,9 @@ export function DashboardShell({ appName }: DashboardShellProps) {
           <span class="sr-only">搜索当前目录</span>
           <input id="searchInput" type="search" placeholder="搜索当前目录" autocomplete="off" />
         </label>
-        <div class="account-area">
+        <div class="account">
           <div class="account-copy"><strong id="who">正在验证身份...</strong><span>管理员</span></div>
-          <button class="icon-btn" id="themeToggle" type="button" aria-label="切换主题" data-tooltip="切换主题"><Icon name="moon" /></button>
+          <button class="btn ghost icon-only" type="button" aria-label="账户菜单" data-tooltip="账户菜单"><Icon name="circle-user-round" /></button>
         </div>
       </header>
 
@@ -29,7 +29,7 @@ export function DashboardShell({ appName }: DashboardShellProps) {
           <button class="nav-button" id="importsNav" type="button" data-panel-target="importsPanel"><Icon name="cloud-download" /><span>导入任务</span><span class="nav-count" id="importNavCount">0</span></button>
           <button class="nav-button" id="trashNav" type="button" data-panel-target="trashPanel"><Icon name="trash-2" /><span>回收站</span><span class="nav-count" id="trashNavCount">0</span></button>
           <div class="sidebar-spacer" />
-          <div class="sidebar-note"><Icon name="shield-check" /><div><strong>Cloudflare Access</strong><span>后台访问已受保护</span></div></div>
+          <div class="storage-block"><span>存储空间</span><div class="storage-track"><span /></div><small>Cloudflare R2</small></div>
         </aside>
 
         <main class="main-area">
@@ -50,8 +50,8 @@ function FilePanel() {
         <div class="heading-actions">
           <button class="btn" id="newFolderButton" type="button"><Icon name="folder-plus" />新建文件夹</button>
           <button class="btn" id="importUrlButton" type="button"><Icon name="link-2" />URL 导入</button>
-          <label class="btn primary file-picker"><Icon name="upload" />上传文件<input id="pickFiles" type="file" multiple /></label>
-          <label class="btn file-picker"><Icon name="folder-up" />上传文件夹<input id="pickFolder" type="file" multiple webkitdirectory="" directory="" /></label>
+          <label class="btn primary file-picker"><Icon name="upload" />上传<input id="pickFiles" type="file" multiple /></label>
+          <label class="btn ghost icon-only file-picker" data-tooltip="上传文件夹"><Icon name="folder-up" /><span class="sr-only">上传文件夹</span><input id="pickFolder" type="file" multiple webkitdirectory="" directory="" /></label>
         </div>
       </div>
 
@@ -75,13 +75,13 @@ function FilePanel() {
         <div class="file-surface" id="dropzone">
           <div class="drop-overlay" id="dropOverlay"><Icon name="upload-cloud" /><strong>松开后上传到当前目录</strong></div>
           <div class="status" id="status" aria-live="polite" />
-          <div class="table-wrap" id="tableView"><table class="file-table"><thead><tr><th class="check-cell"><input id="selectAll" type="checkbox" aria-label="选择全部" /></th><th>名称</th><th class="size-cell">大小</th><th class="time-cell">更新时间</th><th class="menu-cell"><span class="sr-only">操作</span></th></tr></thead><tbody id="rows" /></table></div>
+          <div class="table-wrap" id="tableView"><table class="file-table compact-table"><thead><tr><th class="check-cell"><input id="selectAll" type="checkbox" aria-label="选择全部" /></th><th>名称</th><th class="size-cell">大小</th><th class="time-cell">更新时间</th><th class="menu-cell"><span class="sr-only">操作</span></th></tr></thead><tbody id="rows" /></table></div>
           <div class="file-grid hidden" id="iconView" />
         </div>
         <DetailPanel />
       </div>
 
-      <div class="activity-bar hidden" id="uploadActivity" aria-live="polite"><Icon name="upload-cloud" /><div class="activity-copy"><strong id="uploadTitle">正在上传</strong><span id="uploadMeta" /></div><div class="progress-track"><span id="uploadProgress" /></div><button class="icon-btn" id="hideUploadActivity" type="button" aria-label="收起上传状态"><Icon name="x" /></button></div>
+      <div class="activity-bar hidden" id="uploadActivity" aria-live="polite"><div class="activity-copy"><Icon name="upload-cloud" /><div><strong id="uploadTitle">正在上传</strong><span id="uploadMeta" /></div></div><div class="progress-track"><span id="uploadProgress" /></div><button class="btn ghost icon-only" id="hideUploadActivity" type="button" aria-label="收起上传状态"><Icon name="x" /></button></div>
     </section>
   )
 }
@@ -89,10 +89,9 @@ function FilePanel() {
 function DetailPanel() {
   return (
     <aside class="detail-panel hidden" id="detailPanel" aria-label="项目详情">
-      <div class="detail-head"><div><span class="eyebrow">项目详情</span><h2 id="detailName">-</h2></div><button class="icon-btn" id="closeDetail" type="button" aria-label="关闭详情"><Icon name="x" /></button></div>
-      <div class="detail-preview" id="detailPreview"><Icon name="file" /></div>
-      <dl class="detail-list" id="detailBody" />
-      <div class="detail-actions"><button class="btn primary" id="openFile" type="button"><Icon name="external-link" />在线打开</button><button class="btn" id="downloadFile" type="button"><Icon name="download" />下载</button><button class="btn" id="moveFromDetail" type="button"><Icon name="move" />移动或重命名</button><button class="btn" id="shareFromDetail" type="button"><Icon name="share-2" />分享</button><button class="btn danger" id="deleteFromDetail" type="button"><Icon name="trash-2" />移入回收站</button></div>
+      <div class="detail-head"><div class="detail-title"><Icon name="info" /><h2>文件详情</h2></div></div>
+      <div class="detail-body"><div class="detail-preview" id="detailPreview"><Icon name="file" /></div><strong class="detail-name" id="detailName">-</strong><dl class="detail-list" id="detailBody" />
+      <div class="detail-actions"><button class="btn primary" id="openFile" type="button"><Icon name="play" />在线预览</button><button class="btn" id="downloadFile" type="button"><Icon name="download" />下载</button><button class="btn" id="shareFromDetail" type="button"><Icon name="share-2" />分享</button><button class="btn ghost" id="closeDetail" type="button"><Icon name="x" />关闭详情</button><button class="hidden" id="moveFromDetail" type="button" /><button class="hidden" id="deleteFromDetail" type="button" /></div></div>
     </aside>
   )
 }

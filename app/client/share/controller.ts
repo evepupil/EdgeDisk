@@ -2,14 +2,12 @@ import { getErrorMessage, requestJson } from '../shared/api'
 import { closestElement, requireElement } from '../shared/dom'
 import { baseName, escapeHtml, formatBytes, formatTime, getItemIcon, getMediaType, trimTrailingSlash } from '../shared/format'
 import { iconMarkup, renderIcons } from '../shared/icons'
-import { initTheme } from '../shared/theme'
 import type { ListedFile, ShareFolderView, ShareView } from '../shared/types'
 
 export function initSharePage(): void {
   const root = requireElement<HTMLDivElement>('share-page')
   const elements = {
     crumbs: requireElement<HTMLElement>('crumbs'),
-    themeToggle: requireElement<HTMLButtonElement>('themeToggle'),
     refresh: requireElement<HTMLButtonElement>('refresh'),
     downloadSelected: requireElement<HTMLButtonElement>('downloadSelected'),
     status: requireElement<HTMLElement>('status'),
@@ -102,7 +100,7 @@ export function initSharePage(): void {
       const data = await requestJson<ShareView>(`/share-api/${state.code}?sub=${encodeURIComponent(sub)}`)
       renderSummary(data)
       renderRows(data)
-      setStatus('分享内容已更新', 'success')
+      setStatus('')
     } catch (error) {
       setStatus(getErrorMessage(error, '分享加载失败'), 'error')
     }
@@ -131,7 +129,7 @@ export function initSharePage(): void {
       <td class="check-cell">${directFile ? '' : `<input type="checkbox" data-pick="${escapeHtml(subpath)}" aria-label="选择 ${escapeHtml(file.name)}">`}</td>
       <td><div class="item-name"><span class="item-icon">${iconMarkup(getItemIcon({ kind: 'file', name: file.name }))}</span><span class="name-text">${escapeHtml(file.name)}</span></div></td>
       <td class="size-cell secondary">${escapeHtml(formatBytes(file.size))}</td><td class="time-cell secondary">${escapeHtml(formatTime(file.uploaded))}</td>
-      <td class="share-action-cell"><div class="share-row-actions">${media ? `<button class="btn" type="button" data-play="${escapeHtml(subpath)}"><span class="icon" data-icon="play" aria-hidden="true"></span><span>播放</span></button>` : `<button class="btn" type="button" data-open="${escapeHtml(subpath)}"><span class="icon" data-icon="external-link" aria-hidden="true"></span><span>打开</span></button>`}<a class="icon-btn" href="${sharedUrl(subpath, true)}" download aria-label="下载 ${escapeHtml(file.name)}">${iconMarkup('download')}</a></div></td>
+      <td class="share-action-cell"><div class="share-row-actions">${directFile ? `<a class="btn ghost icon-only" href="${sharedUrl(subpath, true)}" download aria-label="下载 ${escapeHtml(file.name)}">${iconMarkup('download')}</a>` : media ? `<button class="btn ghost icon-only" type="button" data-play="${escapeHtml(subpath)}" aria-label="预览 ${escapeHtml(file.name)}">${iconMarkup('play')}</button>` : `<button class="btn ghost icon-only" type="button" data-open="${escapeHtml(subpath)}" aria-label="打开 ${escapeHtml(file.name)}">${iconMarkup('external-link')}</button>`}</div></td>
     </tr>`
   }
 
@@ -162,8 +160,6 @@ export function initSharePage(): void {
   elements.refresh.addEventListener('click', () => void load(state.sub))
   elements.downloadSelected.addEventListener('click', () => state.selected.forEach((path) => window.open(sharedUrl(path, true), '_blank', 'noopener')))
   elements.closePlayer.addEventListener('click', () => { elements.playerContainer.replaceChildren(); elements.playerDialog.close() })
-  elements.themeToggle.addEventListener('click', initTheme(elements.themeToggle))
-
   renderIcons()
   void load('')
 }

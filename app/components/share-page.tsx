@@ -12,16 +12,11 @@ export function SharePage({ appName, shareCode }: SharePageProps) {
         <a class="brand" href={`/s/${shareCode}`} aria-label={`${appName} 分享首页`}>
           <span class="brand-mark"><Icon name="hard-drive" /></span><strong>{appName}</strong>
         </a>
-        <div class="share-header-actions">
-          <span class="share-badge"><Icon name="shield-check" />公开分享</span>
-          <button class="icon-btn" id="themeToggle" type="button" aria-label="切换主题" data-tooltip="切换主题"><Icon name="moon" /></button>
-        </div>
+        <span class="share-badge"><Icon name="shield-check" />公开分享</span>
       </header>
 
       <main class="share-main">
-        <div class="share-heading">
-          <div><h1 id="shareTitle">分享内容</h1><div class="share-meta"><span id="shareMetaCount">正在读取项目</span><span id="shareMetaSize" /><span id="shareExpiryView" /></div></div>
-        </div>
+        <div class="share-heading"><h1 id="shareTitle">分享内容</h1><div class="share-meta"><span id="shareMetaCount">正在读取项目</span><span id="shareMetaSize" /><span id="shareExpiryView" /></div></div>
 
         <nav class="crumbs" id="crumbs" aria-label="分享位置" />
 
