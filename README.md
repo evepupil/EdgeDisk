@@ -103,7 +103,7 @@ npx wrangler d1 execute edgedisk --remote --file migrations/0001_import_tasks.sq
 ### 后台 API
 
 - `/api/session`
-- `/api/list`
+- `/api/list`（支持 `prefix`、`cursor`、`limit`；超过一页时返回 `cursor` 供继续翻页）
 - `/api/object`
 - `/api/file`
 - `/api/upload`
@@ -116,7 +116,7 @@ npx wrangler d1 execute edgedisk --remote --file migrations/0001_import_tasks.sq
 
 ### 公开接口
 
-- `/share-api/:code`
+- `/share-api/:code`（支持 `sub`、`cursor`）
 - `/s/:code/file`
 
 ## 说明

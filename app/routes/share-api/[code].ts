@@ -10,7 +10,8 @@ export default createRoute(async (c) => {
     const env = c.env as Env
     const shareCode = c.req.param('code') || ''
     const requestUrl = new URL(c.req.url)
-    return json(await getShareView(env, shareCode, normalizeOptionalRelativePath(c.req.query('sub') || ''), requestUrl.origin))
+    const sub = normalizeOptionalRelativePath(c.req.query('sub') || '')
+    return json(await getShareView(env, shareCode, sub, requestUrl.origin, c.req.query('cursor') || null))
   } catch (error) {
     return respondError(error)
   }

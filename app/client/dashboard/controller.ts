@@ -2,6 +2,7 @@ import { getErrorMessage, requestJson } from '../shared/api'
 import { closestElement, closeParentDialog } from '../shared/dom'
 import { baseName, ensureFolderPath, escapeHtml, filterAndSortItems, getMediaType, normalizeInputPath, parentDirectory } from '../shared/format'
 import { iconMarkup, renderIcons } from '../shared/icons'
+import { collectPages } from '../shared/paging'
 import type { DirectoryData, ImportTask, ListedItem, ObjectDetail, ShareItem, ShareTarget, SortMode, TrashItem, ViewMode } from '../shared/types'
 import { getDashboardElements } from './elements'
 import { renderCrumbs, renderDetail, renderDirectory, renderImportTaskDetail, renderImportTasks, renderShares, renderTrashItems, updateSelectionView } from './view'
@@ -28,9 +29,12 @@ type DashboardState = {
 export function initDashboard(): void {
   const elements = getDashboardElements()
   const storedView = localStorage.getItem(viewStorageKey)
+  /** 每次切目录自增，用来丢弃切走之后才回来的旧分页请求。 */
+  let directoryToken = 0
+
   const state: DashboardState = {
     prefix: '',
-    directory: { prefix: '', folders: [], files: [] },
+    directory: { prefix: '', folders: [], files: [], cursor: null, truncated: false },
     visibleItems: [],
     selected: new Set<string>(),
     detail: null,
@@ -45,7 +49,7 @@ export function initDashboard(): void {
     query: '',
   }
 
-  const setStatus = (text: string, kind: '' | 'success' | 'error' = '', target: HTMLElement = elements.status): void => {
+  const setStatus = (text: string, kind: '' | 'success' | 'warning' | 'error' = '', target: HTMLElement = elements.status): void => {
     target.textContent = text
     target.className = kind ? `status ${kind}` : 'status'
   }
@@ -61,16 +65,48 @@ export function initDashboard(): void {
     updateSelectionView(elements, state.visibleItems, state.selected)
   }
 
+  const directoryUrl = (prefix: string, cursor: string | null): string => {
+    const params = new URLSearchParams({ prefix })
+    if (cursor) params.set('cursor', cursor)
+    return `/api/list?${params.toString()}`
+  }
+
   const loadDirectory = async (prefix = state.prefix): Promise<void> => {
+    const token = ++directoryToken
     state.prefix = prefix
     renderCrumbs(elements.crumbs, prefix)
     setStatus('正在加载目录...')
     try {
-      state.directory = await requestJson<DirectoryData>(`/api/list?prefix=${encodeURIComponent(prefix)}`)
+      // 第一页先渲染出来保住秒开手感，剩余页在后台补齐后再整体重绘一次。
+      const first = await requestJson<DirectoryData>(directoryUrl(prefix, null))
+      if (token !== directoryToken) return
+      state.directory = first
       state.selected.clear()
       refreshDirectoryView()
-      setStatus('')
+
+      const result = await collectPages<DirectoryData>({
+        first,
+        fetchNext: (cursor) => requestJson<DirectoryData>(directoryUrl(prefix, cursor)),
+        merge: (accumulated, next) => ({
+          ...next,
+          folders: [...accumulated.folders, ...next.folders],
+          files: [...accumulated.files, ...next.files],
+        }),
+        isStale: () => token !== directoryToken,
+        onProgress: (accumulated) => setStatus(`正在加载目录...已载入 ${accumulated.folders.length + accumulated.files.length} 项`),
+      })
+      if (result.stale) return
+
+      if (result.pagesLoaded > 1) {
+        state.directory = result.value
+        refreshDirectoryView()
+      }
+      setStatus(
+        result.capped ? `目录内容较多，已载入前 ${allItems().length} 项；进入子目录可查看其余内容` : '',
+        result.capped ? 'warning' : ''
+      )
     } catch (error) {
+      if (token !== directoryToken) return
       setStatus(getErrorMessage(error, '目录加载失败'), 'error')
     }
   }

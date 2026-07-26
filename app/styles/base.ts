@@ -114,7 +114,7 @@ export const baseStyles = `
   .status { min-height: 0; color: var(--muted-foreground); }
   .status:not(:empty) { padding: 7px 0; }
   .status.success { color: var(--muted-foreground); }
-  .status.error, .danger-text { color: var(--destructive); }
+  .status.error, .status.warning, .danger-text { color: var(--destructive); }
 
   .crumbs { display: flex; min-width: 0; flex-wrap: wrap; align-items: center; gap: 4px; margin-top: 4px; color: var(--muted-foreground); }
   .crumbs button { display: inline-flex; min-width: 0; align-items: center; gap: 4px; padding: 2px 3px; overflow: hidden; border: 0; color: inherit; background: transparent; text-overflow: ellipsis; cursor: pointer; }

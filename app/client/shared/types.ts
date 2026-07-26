@@ -26,6 +26,9 @@ export type DirectoryData = {
   prefix: string
   folders: ListedFolder[]
   files: ListedFile[]
+  /** 还有下一页时为下一页游标，已经列完为 null。 */
+  cursor: string | null
+  truncated: boolean
 }
 
 export type ObjectDetail = {
@@ -107,6 +110,9 @@ export type ShareFolderView = {
   expiresAt: string | null
   folders: ListedFolder[]
   files: ListedFile[]
+  /** 还有下一页时为下一页游标，已经列完为 null。 */
+  cursor: string | null
+  truncated: boolean
 }
 
 export type ShareView = ShareFileView | ShareFolderView

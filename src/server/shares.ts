@@ -1,6 +1,6 @@
 import { HttpError } from "./errors.ts";
-import { baseName, encodePathForShareKey, joinPath, normalizeRelativeFilePath, toPositiveInteger } from "./path.ts";
-import { streamObject } from "./objects.ts";
+import { baseName, encodePathForShareKey, joinPath, normalizeRelativeFilePath } from "./path.ts";
+import { resolveListPageSize, streamObject } from "./objects.ts";
 import type { Env, ListedFile, ListedFolder, ShareKind, ShareRecord } from "./types.ts";
 
 export async function createShare(env: Env, createdBy: string, kind: ShareKind, path: string, expiresInDays: number | null, origin: string) {
@@ -71,7 +71,7 @@ export async function revokeShare(env: Env, shareCode: string, knownRecord?: Sha
   return true;
 }
 
-export async function getShareView(env: Env, shareCode: string, sub: string, origin: string) {
+export async function getShareView(env: Env, shareCode: string, sub: string, origin: string, cursor?: string | null) {
   const share = await getShareRecord(env, shareCode);
   if (share.kind === "file") {
     const head = await env.DISK.head(share.path);
@@ -95,7 +95,9 @@ export async function getShareView(env: Env, shareCode: string, sub: string, ori
   }
 
   const currentPrefix = joinPath(share.path, sub);
-  const list = await env.DISK.list({ prefix: currentPrefix, delimiter: "/", limit: toPositiveInteger(env.MAX_LIST_KEYS, 1000) });
+  const listOptions: R2ListOptions = { prefix: currentPrefix, delimiter: "/", limit: resolveListPageSize(env) };
+  if (cursor) listOptions.cursor = cursor;
+  const list = await env.DISK.list(listOptions);
   const folders: ListedFolder[] = (list.delimitedPrefixes || [])
     .map((item) => ({ kind: "folder" as const, name: baseName(item.slice(0, -1)), path: item, subpath: item.slice(share.path.length) }))
     .sort((a, b) => a.path.localeCompare(b.path, "zh-CN"));
@@ -122,7 +124,9 @@ export async function getShareView(env: Env, shareCode: string, sub: string, ori
     createdAt: share.createdAt,
     expiresAt: share.expiresAt,
     folders,
-    files
+    files,
+    cursor: list.truncated ? list.cursor : null,
+    truncated: list.truncated
   };
 }
 

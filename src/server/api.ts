@@ -11,7 +11,11 @@ import { listTrashItems, moveToTrash, permanentlyDeleteTrashItem, restoreTrashIt
 import type { Env, SessionInfo } from './types'
 
 const pathQuerySchema = z.object({ path: z.string().trim().min(1, '\u7f3a\u5c11 path \u53c2\u6570') })
-const listQuerySchema = z.object({ prefix: z.string().optional() })
+const listQuerySchema = z.object({
+  prefix: z.string().optional(),
+  cursor: z.string().optional(),
+  limit: z.string().optional()
+})
 const importTaskQuerySchema = z.object({ limit: z.string().optional() })
 const trashQuerySchema = z.object({ limit: z.string().optional() })
 const fileQuerySchema = z.object({ path: z.string().trim().min(1, '\u7f3a\u5c11 path \u53c2\u6570'), download: z.string().optional() })
@@ -54,7 +58,10 @@ api.get('/session', (c) => c.json(c.get('session')))
 
 api.get('/list', zValidator('query', listQuerySchema), async (c) => {
   const query = c.req.valid('query')
-  return c.json(await listDirectory(c.env, normalizeDirectoryPath(query.prefix || '')))
+  return c.json(await listDirectory(c.env, normalizeDirectoryPath(query.prefix || ''), {
+    cursor: query.cursor || null,
+    limit: query.limit ? Number.parseInt(query.limit, 10) : null
+  }))
 })
 
 api.get('/trash', zValidator('query', trashQuerySchema), async (c) => {

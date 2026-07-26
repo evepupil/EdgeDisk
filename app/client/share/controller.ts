@@ -2,6 +2,7 @@ import { getErrorMessage, requestJson } from '../shared/api'
 import { closestElement, requireElement } from '../shared/dom'
 import { baseName, escapeHtml, formatBytes, formatTime, getItemIcon, getMediaType, trimTrailingSlash } from '../shared/format'
 import { iconMarkup, renderIcons } from '../shared/icons'
+import { collectPages } from '../shared/paging'
 import type { ListedFile, ShareFolderView, ShareView } from '../shared/types'
 
 export function initSharePage(): void {
@@ -31,7 +32,10 @@ export function initSharePage(): void {
     mode: 'folder' as 'file' | 'folder',
   }
 
-  const setStatus = (text: string, kind: '' | 'success' | 'error' = ''): void => {
+  /** 每次切目录自增，用来丢弃切走之后才回来的旧分页请求。 */
+  let loadToken = 0
+
+  const setStatus = (text: string, kind: '' | 'success' | 'warning' | 'error' = ''): void => {
     elements.status.textContent = text
     elements.status.className = kind ? `status ${kind}` : 'status'
   }
@@ -92,16 +96,52 @@ export function initSharePage(): void {
     renderIcons(elements.rows)
   }
 
+  const shareViewUrl = (sub: string, cursor: string | null): string => {
+    const params = new URLSearchParams({ sub })
+    if (cursor) params.set('cursor', cursor)
+    return `/share-api/${state.code}?${params.toString()}`
+  }
+
   const load = async (sub = state.sub): Promise<void> => {
+    const token = ++loadToken
     state.sub = sub
     renderCrumbs()
     setStatus('正在加载分享内容...')
     try {
-      const data = await requestJson<ShareView>(`/share-api/${state.code}?sub=${encodeURIComponent(sub)}`)
-      renderSummary(data)
-      renderRows(data)
-      setStatus('')
+      const first = await requestJson<ShareView>(shareViewUrl(sub, null))
+      if (token !== loadToken) return
+      renderSummary(first)
+      renderRows(first)
+
+      if (first.kind === 'file') {
+        setStatus('')
+        return
+      }
+
+      const result = await collectPages<ShareFolderView>({
+        first,
+        fetchNext: (cursor) => requestJson<ShareFolderView>(shareViewUrl(sub, cursor)),
+        merge: (accumulated, next) => ({
+          ...next,
+          folders: [...accumulated.folders, ...next.folders],
+          files: [...accumulated.files, ...next.files],
+        }),
+        isStale: () => token !== loadToken,
+        onProgress: (accumulated) => setStatus(`正在加载分享内容...已载入 ${accumulated.folders.length + accumulated.files.length} 项`),
+      })
+      if (result.stale) return
+
+      if (result.pagesLoaded > 1) {
+        renderSummary(result.value)
+        renderRows(result.value)
+      }
+      const loaded = result.value.folders.length + result.value.files.length
+      setStatus(
+        result.capped ? `内容较多，已载入前 ${loaded} 项；进入子目录可查看其余内容` : '',
+        result.capped ? 'warning' : ''
+      )
     } catch (error) {
+      if (token !== loadToken) return
       setStatus(getErrorMessage(error, '分享加载失败'), 'error')
     }
   }

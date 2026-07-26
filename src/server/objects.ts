@@ -6,9 +6,35 @@ import type { Env, ListedFile, ListedFolder } from "./types.ts";
 
 export const FOLDER_MARKER = ".__edgedisk_folder__";
 
-export async function listDirectory(env: Env, prefix: string) {
+/** R2 `list` 单次最多返回 1000 条，再大的 limit 会被平台截断。 */
+export const MAX_LIST_PAGE_SIZE = 1000;
+
+export type ListDirectoryOptions = {
+  cursor?: string | null;
+  limit?: number | null;
+};
+
+export type DirectoryPage = {
+  prefix: string;
+  folders: ListedFolder[];
+  files: ListedFile[];
+  /** 还有下一页时为下一页游标，已经列完为 null。 */
+  cursor: string | null;
+  truncated: boolean;
+};
+
+export function resolveListPageSize(env: Env, requested?: number | null): number {
+  const configured = toPositiveInteger(env.MAX_LIST_KEYS, MAX_LIST_PAGE_SIZE);
+  const candidate = typeof requested === "number" && Number.isFinite(requested) && requested > 0 ? requested : configured;
+  return Math.min(Math.trunc(candidate), MAX_LIST_PAGE_SIZE);
+}
+
+export async function listDirectory(env: Env, prefix: string, options: ListDirectoryOptions = {}): Promise<DirectoryPage> {
   const trashPrefix = TRASH_PREFIX;
-  const list = await env.DISK.list({ prefix, delimiter: "/", limit: toPositiveInteger(env.MAX_LIST_KEYS, 1000) });
+  const listOptions: R2ListOptions = { prefix, delimiter: "/", limit: resolveListPageSize(env, options.limit) };
+  if (options.cursor) listOptions.cursor = options.cursor;
+
+  const list = await env.DISK.list(listOptions);
   const folders: ListedFolder[] = (list.delimitedPrefixes || [])
     .filter((item) => item !== trashPrefix)
     .map((item) => ({ kind: "folder" as const, name: baseName(item.slice(0, -1)), path: item }))
@@ -25,7 +51,14 @@ export async function listDirectory(env: Env, prefix: string) {
       contentType: item.httpMetadata?.contentType || null
     }))
     .sort((a, b) => a.path.localeCompare(b.path, "zh-CN"));
-  return { prefix, folders, files };
+
+  return {
+    prefix,
+    folders,
+    files,
+    cursor: list.truncated ? list.cursor : null,
+    truncated: list.truncated
+  };
 }
 
 export async function getObjectDetail(env: Env, path: string) {
