@@ -10,6 +10,7 @@ import {
   listImportTasks,
   retryImportTask
 } from './services/import-service.ts'
+import { getStorageStats, reindexFiles, searchFiles } from './services/search-service.ts'
 import { createFolder, getObjectDetail, listDirectory, moveObject, streamObject } from './objects'
 import { normalizeAnyPath, normalizeDirectoryPath, normalizeFilePath, parseOptionalNonNegativeNumber } from './path'
 import {
@@ -60,6 +61,12 @@ const sharesQuerySchema = z.object({
   kind: z.enum(['file', 'folder']),
   path: z.string().trim().min(1, '\u7f3a\u5c11 path \u53c2\u6570')
 })
+const searchQuerySchema = z.object({
+  q: z.string().optional(),
+  limit: z.string().optional(),
+  offset: z.string().optional()
+})
+const reindexQuerySchema = z.object({ cursor: z.string().optional() })
 const allSharesQuerySchema = z.object({
   cursor: z.string().optional(),
   limit: z.string().optional()
@@ -112,6 +119,18 @@ api.get('/list', zValidator('query', listQuerySchema), async (c) => {
     cursor: query.cursor || null,
     limit: query.limit ? Number.parseInt(query.limit, 10) : null
   }))
+})
+
+api.get('/search', zValidator('query', searchQuerySchema), async (c) => {
+  const query = c.req.valid('query')
+  return c.json(await searchFiles(c.env, query.q || null, query.limit || null, query.offset || null))
+})
+
+api.get('/storage', async (c) => c.json(await getStorageStats(c.env)))
+
+api.post('/search/reindex', zValidator('query', reindexQuerySchema), async (c) => {
+  const query = c.req.valid('query')
+  return c.json(await reindexFiles(c.env, query.cursor || null))
 })
 
 api.get('/trash', zValidator('query', trashQuerySchema), async (c) => {

@@ -14,8 +14,9 @@ export function DashboardShell({ appName }: DashboardShellProps) {
         </a>
         <label class="search-field" for="searchInput">
           <Icon name="search" />
-          <span class="sr-only">搜索当前目录</span>
+          <span class="sr-only">搜索文件</span>
           <input id="searchInput" type="search" placeholder="搜索当前目录" autocomplete="off" />
+          <button class="search-scope" id="searchScope" type="button" aria-pressed="false" data-tooltip="切换为全盘搜索">全盘</button>
         </label>
         <div class="account">
           <div class="account-copy"><strong id="who">正在验证身份...</strong><span>管理员</span></div>
@@ -30,7 +31,7 @@ export function DashboardShell({ appName }: DashboardShellProps) {
           <button class="nav-button" id="sharesNav" type="button" data-panel-target="sharesPanel"><Icon name="share-2" /><span>分享管理</span><span class="nav-count" id="shareNavCount">0</span></button>
           <button class="nav-button" id="trashNav" type="button" data-panel-target="trashPanel"><Icon name="trash-2" /><span>回收站</span><span class="nav-count" id="trashNavCount">0</span></button>
           <div class="sidebar-spacer" />
-          <div class="storage-block"><span>存储空间</span><div class="storage-track"><span /></div><small>Cloudflare R2</small></div>
+          <div class="storage-block"><span>存储空间</span><div class="storage-track"><span id="storageBar" /></div><small id="storageSummary">Cloudflare R2</small></div>
         </aside>
 
         <main class="main-area">
@@ -48,7 +49,7 @@ function FilePanel() {
   return (
     <section class="app-panel" id="filesPanel">
       <div class="page-heading">
-        <div><h1>全部文件</h1><nav class="crumbs" id="crumbs" aria-label="当前位置" /></div>
+        <div><h1 id="filesHeading">全部文件</h1><nav class="crumbs" id="crumbs" aria-label="当前位置" /></div>
         <div class="heading-actions">
           <button class="btn" id="newFolderButton" type="button"><Icon name="folder-plus" />新建文件夹</button>
           <button class="btn" id="importUrlButton" type="button"><Icon name="link-2" />URL 导入</button>

@@ -104,6 +104,10 @@ export const dashboardStyles = `
   .share-data-row { grid-template-columns: minmax(0, 1fr) auto auto; }
   .share-manage-row { grid-template-columns: 26px minmax(0, 1.6fr) 150px 160px auto; }
   .share-pick { display: flex; align-items: center; }
+
+  .search-scope { flex: none; padding: 2px 8px; border: 1px solid var(--border); border-radius: 999px; color: var(--muted-foreground); background: transparent; font-size: 11px; cursor: pointer; }
+  .search-scope[aria-pressed="true"] { border-color: transparent; color: var(--accent-foreground); background: var(--accent); }
+  .search-result-dir { color: var(--muted-foreground); font-size: 12px; }
   @keyframes edgedisk-spin { to { transform: rotate(360deg); } }
 
   @media (prefers-reduced-motion: reduce) {

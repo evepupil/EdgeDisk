@@ -219,12 +219,19 @@ function renderUploadRow(file: UploadFileState): string {
   </div>`
 }
 
+/** 全盘搜索结果里同名文件很常见，把所在目录跟在名字后面才能区分开。 */
+function directoryHint(item: ListedItem): string {
+  const directory = item.kind === 'file' ? item.directory : undefined
+  if (!directory) return ''
+  return `<span class="search-result-dir">${escapeHtml(`/${directory}`)}</span>`
+}
+
 function renderTableRow(item: ListedItem, selected: boolean): string {
   const icon = getItemIcon(item)
   const details = actionMenu(item)
   return `<tr class="file-row${selected ? ' selected' : ''}" data-kind="${item.kind}" data-path="${escapeHtml(item.path)}">
     <td class="check-cell"><input type="checkbox" data-select-path="${escapeHtml(item.path)}" aria-label="选择 ${escapeHtml(item.name)}"${selected ? ' checked' : ''}></td>
-    <td><div class="item-name"><span class="item-icon${item.kind === 'folder' ? ' folder' : ''}">${iconMarkup(icon)}</span><span class="name-text">${escapeHtml(item.name)}</span></div></td>
+    <td><div class="item-name"><span class="item-icon${item.kind === 'folder' ? ' folder' : ''}">${iconMarkup(icon)}</span><span class="name-text">${escapeHtml(item.name)}</span>${directoryHint(item)}</div></td>
     <td class="size-cell secondary">${item.kind === 'file' ? escapeHtml(formatBytes(item.size)) : '-'}</td>
     <td class="time-cell secondary">${item.kind === 'file' ? escapeHtml(formatTime(item.uploaded)) : '-'}</td>
     <td class="menu-cell">${details}</td>
@@ -236,7 +243,7 @@ function renderGridItem(item: ListedItem, selected: boolean): string {
     <div class="file-card-head"><input type="checkbox" data-select-path="${escapeHtml(item.path)}" aria-label="选择 ${escapeHtml(item.name)}"${selected ? ' checked' : ''}>${actionMenu(item)}</div>
     <span class="file-card-icon${item.kind === 'folder' ? ' folder' : ''}">${iconMarkup(getItemIcon(item))}</span>
     <strong class="file-card-name">${escapeHtml(item.name)}</strong>
-    <span class="file-card-meta">${item.kind === 'file' ? escapeHtml(formatBytes(item.size)) : '文件夹'}</span>
+    <span class="file-card-meta">${item.kind === 'file' ? escapeHtml(formatBytes(item.size)) : '文件夹'}${directoryHint(item)}</span>
   </article>`
 }
 

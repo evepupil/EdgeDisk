@@ -1,9 +1,9 @@
 import { getErrorMessage, requestJson } from '../shared/api'
 import { closestElement, closeParentDialog } from '../shared/dom'
-import { baseName, ensureFolderPath, escapeHtml, filterAndSortItems, getMediaType, normalizeInputPath, parentDirectory } from '../shared/format'
+import { baseName, ensureFolderPath, escapeHtml, filterAndSortItems, formatBytes, getMediaType, normalizeInputPath, parentDirectory } from '../shared/format'
 import { iconMarkup, renderIcons } from '../shared/icons'
 import { collectPages } from '../shared/paging'
-import type { DirectoryData, ImportTask, ListedItem, ObjectDetail, ShareItem, ShareTarget, SortMode, TrashItem, ViewMode } from '../shared/types'
+import type { DirectoryData, ImportTask, ListedFile, ListedItem, ObjectDetail, ShareItem, ShareTarget, SortMode, TrashItem, ViewMode } from '../shared/types'
 import { getDashboardElements } from './elements'
 import { createUploader } from './uploader'
 import { renderAllShares, renderCrumbs, renderDetail, renderDirectory, renderImportTaskDetail, renderImportTasks, renderShares, renderTrashItems, renderUploadActivity, updateSelectionView, updateShareSelectionView } from './view'
@@ -27,6 +27,10 @@ type DashboardState = {
   viewMode: ViewMode
   sort: SortMode
   query: string
+  /** 搜索范围：当前目录在浏览器里筛选，全盘走服务端索引。 */
+  searchScope: 'directory' | 'global'
+  /** 全盘搜索结果。非空时列表展示的是搜索结果而不是目录内容。 */
+  searchResults: ListedFile[] | null
 }
 
 export function initDashboard(): void {
@@ -52,6 +56,8 @@ export function initDashboard(): void {
     viewMode: storedView === 'icon' ? 'icon' : 'table',
     sort: 'name',
     query: '',
+    searchScope: 'directory',
+    searchResults: null,
   }
 
   const setStatus = (text: string, kind: '' | 'success' | 'warning' | 'error' = '', target: HTMLElement = elements.status): void => {
@@ -59,12 +65,16 @@ export function initDashboard(): void {
     target.className = kind ? `status ${kind}` : 'status'
   }
 
-  const allItems = (): ListedItem[] => [...state.directory.folders, ...state.directory.files]
+  const allItems = (): ListedItem[] =>
+    state.searchResults ? [...state.searchResults] : [...state.directory.folders, ...state.directory.files]
   const findItem = (path: string): ListedItem | undefined => allItems().find((item) => item.path === path)
   const selectedItems = (): ListedItem[] => allItems().filter((item) => state.selected.has(item.path))
 
   const refreshDirectoryView = (): void => {
-    state.visibleItems = filterAndSortItems(allItems(), state.query, state.sort)
+    // 全盘搜索的结果由服务端筛好了，再套一遍本地关键词筛选会把结果二次削减。
+    state.visibleItems = state.searchResults
+      ? filterAndSortItems(state.searchResults, '', state.sort)
+      : filterAndSortItems(allItems(), state.query, state.sort)
     renderDirectory(elements, state.visibleItems, state.selected)
     elements.fileNavCount.textContent = String(allItems().length)
     updateSelectionView(elements, state.visibleItems, state.selected)
@@ -79,6 +89,8 @@ export function initDashboard(): void {
   const loadDirectory = async (prefix = state.prefix): Promise<void> => {
     const token = ++directoryToken
     state.prefix = prefix
+    // 进目录就离开搜索结果视图，否则列表内容和面包屑会对不上。
+    exitSearchResults()
     renderCrumbs(elements.crumbs, prefix)
     setStatus('正在加载目录...')
     try {
@@ -113,6 +125,70 @@ export function initDashboard(): void {
     } catch (error) {
       if (token !== directoryToken) return
       setStatus(getErrorMessage(error, '目录加载失败'), 'error')
+    }
+  }
+
+  /** 每次全盘搜索自增，丢弃过期请求的结果（输入快时响应可能乱序回来）。 */
+  let searchToken = 0
+
+  const exitSearchResults = (): void => {
+    state.searchResults = null
+    elements.filesHeading.textContent = '全部文件'
+    elements.crumbs.classList.remove('hidden')
+  }
+
+  const runGlobalSearch = async (): Promise<void> => {
+    const query = state.query.trim()
+    if (!query) {
+      exitSearchResults()
+      refreshDirectoryView()
+      setStatus('')
+      return
+    }
+
+    const token = ++searchToken
+    setStatus('正在全盘搜索...')
+    try {
+      const data = await requestJson<{ files: ListedFile[]; hasMore: boolean; limit: number }>(
+        `/api/search?q=${encodeURIComponent(query)}&limit=200`
+      )
+      if (token !== searchToken) return
+      state.searchResults = data.files
+      state.selected.clear()
+      elements.filesHeading.textContent = `搜索结果：${query}`
+      elements.crumbs.classList.add('hidden')
+      refreshDirectoryView()
+      setStatus(
+        data.hasMore ? `匹配较多，仅显示前 ${data.files.length} 个结果` : `找到 ${data.files.length} 个文件`,
+        data.hasMore ? 'warning' : ''
+      )
+    } catch (error) {
+      if (token !== searchToken) return
+      setStatus(getErrorMessage(error, '搜索失败'), 'error')
+    }
+  }
+
+  const setSearchScope = (scope: 'directory' | 'global'): void => {
+    state.searchScope = scope
+    elements.searchScope.setAttribute('aria-pressed', String(scope === 'global'))
+    elements.searchInput.placeholder = scope === 'global' ? '搜索全部文件' : '搜索当前目录'
+    if (scope === 'global') {
+      void runGlobalSearch()
+      return
+    }
+    exitSearchResults()
+    refreshDirectoryView()
+    setStatus('')
+  }
+
+  const loadStorageStats = async (): Promise<void> => {
+    try {
+      const stats = await requestJson<{ files: number; totalSize: number }>('/api/storage')
+      elements.storageSummary.textContent = `${stats.files} 个文件 · ${formatBytes(stats.totalSize)}`
+      // R2 没有配额概念，这里没有「用了百分之几」可言，用固定填充表示已统计。
+      elements.storageBar.style.width = stats.files ? '100%' : '0%'
+    } catch {
+      elements.storageSummary.textContent = 'Cloudflare R2'
     }
   }
 
@@ -498,10 +574,20 @@ export function initDashboard(): void {
     refreshDirectoryView()
   })
 
+  let searchDebounce = 0
   elements.searchInput.addEventListener('input', () => {
     state.query = elements.searchInput.value
     state.selected.clear()
-    refreshDirectoryView()
+    if (state.searchScope === 'directory') {
+      refreshDirectoryView()
+      return
+    }
+    // 全盘搜索要打网络请求，等用户停手再发，别每敲一个字就查一次。
+    window.clearTimeout(searchDebounce)
+    searchDebounce = window.setTimeout(() => void runGlobalSearch(), 300)
+  })
+  elements.searchScope.addEventListener('click', () => {
+    setSearchScope(state.searchScope === 'global' ? 'directory' : 'global')
   })
   elements.sortSelect.addEventListener('change', () => {
     state.sort = elements.sortSelect.value as SortMode
@@ -652,6 +738,7 @@ export function initDashboard(): void {
     loadImportTasks(true),
     loadAllShares(true),
     loadTrash(true),
+    loadStorageStats(),
   ]).catch((error: unknown) => setStatus(getErrorMessage(error, '初始化失败'), 'error'))
 
 }

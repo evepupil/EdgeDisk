@@ -1,6 +1,7 @@
 import { HttpError } from "./errors.ts";
 import { buildContentDisposition, inferContentType } from "./file-http.ts";
 import { baseName, joinPath, sanitizePath, toPositiveInteger } from "./path.ts";
+import { upsertIndexedFile } from "./repos/file-index-repo.ts";
 import type { Env } from "./types.ts";
 
 export type ImportInput = {
@@ -78,6 +79,13 @@ export async function importFromUrl(env: Env, input: ImportInput) {
     if (error instanceof HttpError) throw error;
     throw new RetryableImportError(503, error instanceof Error ? error.message : "远程导入失败");
   }
+
+  await upsertIndexedFile(env, {
+    path: targetKey,
+    size: contentLength,
+    contentType: resolvedContentType || null,
+    uploaded: new Date().toISOString()
+  });
 
   return {
     imported: true,

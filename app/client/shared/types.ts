@@ -18,6 +18,8 @@ export type ListedFile = {
   etag: string | null
   contentType: string | null
   subpath?: string
+  /** 所在目录。全盘搜索结果会带上，用来区分同名文件。 */
+  directory?: string
 }
 
 export type ListedItem = ListedFolder | ListedFile

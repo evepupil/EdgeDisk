@@ -2,6 +2,7 @@ import { HttpError } from "./errors.ts";
 import { inferContentType } from "./file-http.ts";
 import { FOLDER_MARKER } from "./objects.ts";
 import { baseName, toPositiveInteger } from "./path.ts";
+import { upsertIndexedFile } from "./repos/file-index-repo.ts";
 import { TRASH_PREFIX } from "./storage.ts";
 import type { Env } from "./types.ts";
 
@@ -74,6 +75,7 @@ export async function putDirectObject(env: Env, key: string, body: ReadableStrea
   const object = await env.DISK.put(key, body, {
     httpMetadata: { contentType: inferContentType(contentType, key) }
   });
+  await indexUploadedObject(env, object);
   return { path: object.key, size: object.size };
 }
 
@@ -101,7 +103,18 @@ export async function completeMultipartUpload(env: Env, key: string, uploadId: s
   if (!parts.length) throw new HttpError(400, "分片列表为空");
   const ordered = sortParts(assertDistinctParts(parts));
   const object = await env.DISK.resumeMultipartUpload(key, uploadId).complete(ordered);
+  await indexUploadedObject(env, object);
   return { path: object.key, size: object.size, parts: ordered.length };
+}
+
+/** 上传成功后同步文件索引，让新文件立刻能被搜到。 */
+async function indexUploadedObject(env: Env, object: R2Object): Promise<void> {
+  await upsertIndexedFile(env, {
+    path: object.key,
+    size: object.size,
+    contentType: object.httpMetadata?.contentType || null,
+    uploaded: object.uploaded ? object.uploaded.toISOString() : null
+  });
 }
 
 export async function abortMultipartUpload(env: Env, key: string, uploadId: string) {

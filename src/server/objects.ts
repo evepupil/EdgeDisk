@@ -2,6 +2,13 @@ import { HttpError } from "./errors.ts";
 import { applyDownloadHeaders } from "./file-http.ts";
 import { TRASH_PREFIX } from "./storage.ts";
 import { baseName, joinPath, toPositiveInteger } from "./path.ts";
+import {
+  deleteIndexedFile,
+  deleteIndexedFilesByPrefix,
+  upsertIndexedFile,
+  upsertIndexedFiles,
+  type IndexedFileInput
+} from "./repos/file-index-repo.ts";
 import type { Env, ListedFile, ListedFolder } from "./types.ts";
 
 export const FOLDER_MARKER = ".__edgedisk_folder__";
@@ -111,20 +118,36 @@ export async function moveObject(env: Env, sourcePath: string, targetPath: strin
     const existingTargetKeys = await collectObjectKeys(env, targetPath);
     if (existingTargetKeys.length) throw new HttpError(409, "目标文件夹已存在内容");
 
+    const moved: IndexedFileInput[] = [];
     for (const sourceKey of sourceKeys) {
       const suffix = sourceKey.slice(sourcePath.length);
-      await copyObject(env, sourceKey, joinPath(targetPath, suffix));
+      const targetKey = joinPath(targetPath, suffix);
+      const object = await copyObject(env, sourceKey, targetKey);
+      moved.push(toIndexInput(targetKey, object));
     }
     await env.DISK.delete(sourceKeys);
+    await deleteIndexedFilesByPrefix(env, sourcePath);
+    await upsertIndexedFiles(env, moved.filter((entry) => baseName(entry.path) !== FOLDER_MARKER));
     return { moved: sourceKeys.length, kind: "folder", path: sourcePath, targetPath };
   }
 
   const head = await env.DISK.head(sourcePath);
   if (!head) throw new HttpError(404, "源文件不存在");
   if (await env.DISK.head(targetPath)) throw new HttpError(409, "目标文件已存在");
-  await copyObject(env, sourcePath, targetPath);
+  const copied = await copyObject(env, sourcePath, targetPath);
   await env.DISK.delete(sourcePath);
+  await deleteIndexedFile(env, sourcePath);
+  await upsertIndexedFile(env, toIndexInput(targetPath, copied));
   return { moved: 1, kind: "file", path: sourcePath, targetPath };
+}
+
+function toIndexInput(path: string, object: R2Object | null): IndexedFileInput {
+  return {
+    path,
+    size: object?.size ?? 0,
+    contentType: object?.httpMetadata?.contentType || null,
+    uploaded: object?.uploaded ? object.uploaded.toISOString() : null
+  };
 }
 
 export async function deleteObject(env: Env, path: string) {
@@ -237,10 +260,10 @@ export async function collectObjectKeys(env: Env, prefix: string): Promise<strin
   return keys;
 }
 
-async function copyObject(env: Env, sourceKey: string, targetKey: string) {
+async function copyObject(env: Env, sourceKey: string, targetKey: string): Promise<R2Object> {
   const object = await env.DISK.get(sourceKey);
   if (!object) throw new HttpError(404, `对象不存在：${sourceKey}`);
-  await env.DISK.put(targetKey, object.body, {
+  return await env.DISK.put(targetKey, object.body, {
     httpMetadata: object.httpMetadata,
     customMetadata: object.customMetadata
   });

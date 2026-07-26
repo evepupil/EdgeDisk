@@ -1,6 +1,13 @@
 import { HttpError } from './errors.ts'
 import { FOLDER_MARKER } from './objects.ts'
 import { baseName, joinPath, normalizeAnyPath, normalizeDirectoryPath } from './path.ts'
+import {
+  deleteIndexedFile,
+  deleteIndexedFilesByPrefix,
+  upsertIndexedFile,
+  upsertIndexedFiles,
+  type IndexedFileInput
+} from './repos/file-index-repo.ts'
 import { deleteTrashItemRow, findTrashItemRow, insertTrashItem, listTrashItemRows } from './repos/trash-repo.ts'
 import { TRASH_PREFIX } from './storage.ts'
 import type { Env, TrashItem } from './types.ts'
@@ -27,6 +34,8 @@ export async function moveToTrash(env: Env, path: string, deletedBy: string) {
       })
     }
     await env.DISK.delete(keys)
+    // 回收站里的文件不该出现在搜索结果里，否则用户会以为文件还在原处。
+    await deleteIndexedFilesByPrefix(env, path)
 
     await insertTrashItem(env, {
       id: itemId,
@@ -53,6 +62,7 @@ export async function moveToTrash(env: Env, path: string, deletedBy: string) {
     customMetadata: object.customMetadata
   })
   await env.DISK.delete(path)
+  await deleteIndexedFile(env, path)
 
   await insertTrashItem(env, {
     id: itemId,
@@ -94,17 +104,27 @@ export async function restoreTrashItem(env: Env, itemId: string) {
     const trashKeys = await collectObjectKeys(env, item.storagePrefix)
     if (!trashKeys.length) throw new HttpError(404, '\u56de\u6536\u7ad9\u5bf9\u8c61\u5df2\u4e0d\u5b58\u5728')
 
+    const restored: IndexedFileInput[] = []
     for (const trashKey of trashKeys) {
       const object = await env.DISK.get(trashKey)
       if (!object) continue
       const suffix = trashKey.slice(item.storagePrefix.length)
       const targetKey = joinPath(originalPath, suffix)
-      await env.DISK.put(targetKey, object.body, {
+      const written = await env.DISK.put(targetKey, object.body, {
         httpMetadata: object.httpMetadata,
         customMetadata: object.customMetadata
       })
+      if (baseName(targetKey) !== FOLDER_MARKER) {
+        restored.push({
+          path: targetKey,
+          size: written.size,
+          contentType: written.httpMetadata?.contentType || null,
+          uploaded: written.uploaded ? written.uploaded.toISOString() : null
+        })
+      }
     }
     await env.DISK.delete(trashKeys)
+    await upsertIndexedFiles(env, restored)
     await deleteTrashItemRow(env, itemId)
     return { restored: trashKeys.length, kind: 'folder', path: originalPath }
   }
@@ -115,11 +135,17 @@ export async function restoreTrashItem(env: Env, itemId: string) {
   if (!trashKey) throw new HttpError(404, '\u56de\u6536\u7ad9\u5bf9\u8c61\u5df2\u4e0d\u5b58\u5728')
   const object = await env.DISK.get(trashKey)
   if (!object) throw new HttpError(404, '\u56de\u6536\u7ad9\u5bf9\u8c61\u5df2\u4e0d\u5b58\u5728')
-  await env.DISK.put(originalPath, object.body, {
+  const written = await env.DISK.put(originalPath, object.body, {
     httpMetadata: object.httpMetadata,
     customMetadata: object.customMetadata
   })
   await env.DISK.delete(trashKeys)
+  await upsertIndexedFile(env, {
+    path: originalPath,
+    size: written.size,
+    contentType: written.httpMetadata?.contentType || null,
+    uploaded: written.uploaded ? written.uploaded.toISOString() : null
+  })
   await deleteTrashItemRow(env, itemId)
   return { restored: 1, kind: 'file', path: originalPath }
 }

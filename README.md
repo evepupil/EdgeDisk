@@ -6,7 +6,7 @@
 - `Hono`：后台 API 与路由分发
 - `R2`：文件存储
 - `KV`：分享短链映射
-- `D1 + Drizzle`：URL 导入任务
+- `D1 + Drizzle`：URL 导入任务、回收站记录、全盘搜索的文件索引
 - `Queues`：URL 导入异步消费
 - `Zod`：接口与任务消息校验
 - `Access`：后台 `/app` 和 `/api/*` 保护
@@ -88,9 +88,22 @@ npm run deploy
 
 ### D1 初始化
 
+按顺序执行 `migrations/` 下的所有文件：
+
 ```bash
 npx wrangler d1 execute edgedisk --remote --file migrations/0001_import_tasks.sql
 ```
+
+```bash
+npx wrangler d1 execute edgedisk --remote --file migrations/0002_trash_items.sql
+```
+
+```bash
+npx wrangler d1 execute edgedisk --remote --file migrations/0003_file_index.sql
+```
+
+`file_index` 是全盘搜索用的文件索引。存量文件不会自动进索引，建表后需要调一次
+`POST /api/search/reindex` 做回填；返回 `done: false` 时带上返回的 `cursor` 继续调，直到 `done: true`。
 
 ## 路由
 
@@ -104,6 +117,9 @@ npx wrangler d1 execute edgedisk --remote --file migrations/0001_import_tasks.sq
 
 - `/api/session`
 - `/api/list`（支持 `prefix`、`cursor`、`limit`；超过一页时返回 `cursor` 供继续翻页）
+- `/api/search`（全盘搜索，支持 `q`、`limit`、`offset`）
+- `/api/search/reindex`（从 R2 重建文件索引，支持 `cursor` 续跑）
+- `/api/storage`（文件数与总占用）
 - `/api/object`
 - `/api/file`
 - `/api/upload/config`（片大小、最大片数、单文件上限）
@@ -133,6 +149,7 @@ npx wrangler d1 execute edgedisk --remote --file migrations/0001_import_tasks.sq
 ## 后续还值得做
 
 - 为分享加入访问密码、下载日志、限速策略
-- 全盘搜索（服务端索引）与存储用量统计
 - 大目录虚拟滚动、目录路径同步到 URL
 - 文件夹拖放上传（当前只支持按钮选择文件夹）
+- 打包下载（当前多文件下载是逐个触发）
+- 回收站保留期与自动清理
