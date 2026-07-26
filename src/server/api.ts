@@ -3,7 +3,13 @@ import { Hono } from 'hono'
 import { z } from 'zod'
 import { requireAdmin } from './auth'
 import { HttpError, respondError } from './errors'
-import { createImportTask, listImportTasks } from './services/import-service.ts'
+import {
+  cancelImportTask,
+  clearFinishedImportTasks,
+  createImportTask,
+  listImportTasks,
+  retryImportTask
+} from './services/import-service.ts'
 import { createFolder, getObjectDetail, listDirectory, moveObject, streamObject } from './objects'
 import { normalizeAnyPath, normalizeDirectoryPath, normalizeFilePath, parseOptionalNonNegativeNumber } from './path'
 import { createShare, listSharesByTarget, retargetSharesForMove, revokeShare, revokeSharesForPath } from './shares'
@@ -26,6 +32,7 @@ const listQuerySchema = z.object({
   limit: z.string().optional()
 })
 const importTaskQuerySchema = z.object({ limit: z.string().optional() })
+const importTaskActionSchema = z.object({ id: z.string().trim().min(1, '缺少任务 ID') })
 const trashQuerySchema = z.object({ limit: z.string().optional() })
 const fileQuerySchema = z.object({ path: z.string().trim().min(1, '\u7f3a\u5c11 path \u53c2\u6570'), download: z.string().optional() })
 const folderSchema = z.object({ path: z.string().trim().min(1, '\u7f3a\u5c11 path \u53c2\u6570') })
@@ -113,6 +120,18 @@ api.get('/import-tasks', zValidator('query', importTaskQuerySchema), async (c) =
   const query = c.req.valid('query')
   return c.json({ tasks: await listImportTasks(c.env, query.limit || null) })
 })
+
+api.post('/import-tasks/cancel', zValidator('json', importTaskActionSchema), async (c) => {
+  const payload = c.req.valid('json')
+  return c.json(await cancelImportTask(c.env, payload.id))
+})
+
+api.post('/import-tasks/retry', zValidator('json', importTaskActionSchema), async (c) => {
+  const payload = c.req.valid('json')
+  return c.json(await retryImportTask(c.env, payload.id))
+})
+
+api.delete('/import-tasks', async (c) => c.json(await clearFinishedImportTasks(c.env)))
 
 api.get('/object', zValidator('query', pathQuerySchema), async (c) => {
   const query = c.req.valid('query')

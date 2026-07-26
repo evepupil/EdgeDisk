@@ -110,7 +110,7 @@ function DetailPanel() {
 }
 
 function ImportsPanel() {
-  return <section class="app-panel hidden" id="importsPanel"><div class="page-heading"><div><h1>导入任务</h1><p>查看从 URL 导入的文件进度和结果。</p></div><div class="heading-actions"><button class="btn" id="refreshImports" type="button"><Icon name="refresh-cw" />刷新</button><button class="btn primary" id="newImportFromPanel" type="button"><Icon name="plus" />新建导入</button></div></div><div class="status" id="importStatus" aria-live="polite" /><div class="data-list" id="importTasks"><div class="empty-state"><Icon name="cloud-download" /><strong>暂无导入任务</strong></div></div></section>
+  return <section class="app-panel hidden" id="importsPanel"><div class="page-heading"><div><h1>导入任务</h1><p>查看从 URL 导入的文件进度和结果。</p></div><div class="heading-actions"><button class="btn" id="refreshImports" type="button"><Icon name="refresh-cw" />刷新</button><button class="btn" id="clearFinishedImports" type="button"><Icon name="trash-2" />清空已结束</button><button class="btn primary" id="newImportFromPanel" type="button"><Icon name="plus" />新建导入</button></div></div><div class="status" id="importStatus" aria-live="polite" /><div class="data-list" id="importTasks"><div class="empty-state"><Icon name="cloud-download" /><strong>暂无导入任务</strong></div></div></section>
 }
 
 function TrashPanel() {

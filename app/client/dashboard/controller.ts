@@ -306,6 +306,41 @@ export function initDashboard(): void {
     }
   }
 
+  const cancelImportTask = async (taskId: string): Promise<void> => {
+    try {
+      const result = await requestJson<{ wasRunning: boolean }>('/api/import-tasks/cancel', {
+        method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id: taskId }),
+      })
+      // 已经在下载的任务无法中断请求，只能等它下完再把落地的文件清掉。
+      setStatus(result.wasRunning ? '任务已标记取消，正在下载的部分会在结束后回滚' : '任务已取消', 'success', elements.importStatus)
+      await loadImportTasks(true)
+    } catch (error) {
+      setStatus(getErrorMessage(error, '取消任务失败'), 'error', elements.importStatus)
+    }
+  }
+
+  const retryImportTask = async (taskId: string): Promise<void> => {
+    try {
+      await requestJson('/api/import-tasks/retry', {
+        method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id: taskId }),
+      })
+      setStatus('任务已重新排队', 'success', elements.importStatus)
+      await loadImportTasks(true)
+    } catch (error) {
+      setStatus(getErrorMessage(error, '重试任务失败'), 'error', elements.importStatus)
+    }
+  }
+
+  const clearFinishedImports = async (): Promise<void> => {
+    try {
+      const result = await requestJson<{ cleared: number }>('/api/import-tasks', { method: 'DELETE' })
+      setStatus(result.cleared ? `已清空 ${result.cleared} 条已结束任务` : '没有已结束的任务', 'success', elements.importStatus)
+      await loadImportTasks(true)
+    } catch (error) {
+      setStatus(getErrorMessage(error, '清空任务失败'), 'error', elements.importStatus)
+    }
+  }
+
   const loadTrash = async (silent = false): Promise<void> => {
     if (!silent) setStatus('正在加载回收站...', '', elements.trashStatus)
     try {
@@ -485,7 +520,13 @@ export function initDashboard(): void {
 
   elements.refreshImports.addEventListener('click', () => void loadImportTasks())
   elements.refreshTrash.addEventListener('click', () => void loadTrash())
+  elements.clearFinishedImports.addEventListener('click', () => void clearFinishedImports())
   elements.importTasks.addEventListener('click', (event) => {
+    const cancelId = closestElement(event.target, '[data-task-cancel]')?.dataset.taskCancel
+    if (cancelId) { void cancelImportTask(cancelId); return }
+    const retryId = closestElement(event.target, '[data-task-retry]')?.dataset.taskRetry
+    if (retryId) { void retryImportTask(retryId); return }
+
     const taskId = closestElement(event.target, '[data-task-id]')?.dataset.taskId
     const task = state.importTasks.find((candidate) => candidate.id === taskId)
     if (!task) return

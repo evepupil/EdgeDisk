@@ -15,7 +15,7 @@ export interface Env {
 
 export type SessionInfo = { email: string };
 export type ShareKind = "file" | "folder";
-export type ImportTaskStatus = "queued" | "running" | "succeeded" | "failed";
+export type ImportTaskStatus = "queued" | "running" | "succeeded" | "failed" | "canceled";
 export type ImportQueueMessage = { taskId: string };
 
 export type ShareRecord = {

@@ -43,7 +43,7 @@ export type ObjectDetail = {
   totalSize?: number
 }
 
-export type ImportTaskStatus = 'queued' | 'running' | 'succeeded' | 'failed'
+export type ImportTaskStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'canceled'
 
 export type ImportTask = {
   id: string

@@ -38,6 +38,7 @@ export function getDashboardElements() {
     importTasks: requireElement<HTMLDivElement>('importTasks'),
     trashList: requireElement<HTMLDivElement>('trashList'),
     refreshImports: requireElement<HTMLButtonElement>('refreshImports'),
+    clearFinishedImports: requireElement<HTMLButtonElement>('clearFinishedImports'),
     refreshTrash: requireElement<HTMLButtonElement>('refreshTrash'),
     detailPanel: requireElement<HTMLElement>('detailPanel'),
     detailName: requireElement<HTMLElement>('detailName'),

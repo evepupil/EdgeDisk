@@ -6,7 +6,9 @@ import type { DashboardElements } from './elements'
 import type { UploadFileState, UploadSnapshot } from './uploader'
 
 const numberFormat = new Intl.NumberFormat('zh-CN')
-const taskLabels: Record<ImportTask['status'], string> = { queued: '排队中', running: '导入中', succeeded: '已完成', failed: '失败' }
+const taskLabels: Record<ImportTask['status'], string> = { queued: '排队中', running: '导入中', succeeded: '已完成', failed: '失败', canceled: '已取消' }
+const CANCELABLE_TASK_STATUSES: ReadonlySet<ImportTask['status']> = new Set(['queued', 'running'])
+const RETRYABLE_TASK_STATUSES: ReadonlySet<ImportTask['status']> = new Set(['failed', 'canceled'])
 
 export function renderCrumbs(container: HTMLElement, prefix: string): void {
   const parts = prefix.replace(/\/$/, '').split('/').filter(Boolean)
@@ -84,12 +86,18 @@ export function renderImportTasks(container: HTMLElement, tasks: ImportTask[]): 
   container.innerHTML = tasks.map((task) => {
     const title = task.resolvedFileName || task.requestedFileName || task.targetPath || task.sourceUrl
     const statusClass = task.status === 'succeeded' ? 'success' : task.status === 'failed' ? 'error' : task.status === 'running' ? 'running' : 'warning'
+    const cancel = CANCELABLE_TASK_STATUSES.has(task.status)
+      ? `<button class="icon-btn" type="button" data-task-cancel="${escapeHtml(task.id)}" aria-label="取消任务" data-tooltip="取消任务">${iconMarkup('circle-x')}</button>`
+      : ''
+    const retry = RETRYABLE_TASK_STATUSES.has(task.status)
+      ? `<button class="icon-btn" type="button" data-task-retry="${escapeHtml(task.id)}" aria-label="重试任务" data-tooltip="重试任务">${iconMarkup('restore')}</button>`
+      : ''
     return `<article class="data-row">
       <div class="data-row-main"><strong>${escapeHtml(title)}</strong><span>${escapeHtml(task.targetPath || task.directory || '/')}</span></div>
       <span class="hide-mobile data-cell-muted">${escapeHtml(hostName(task.sourceUrl))}</span>
       <span class="status-pill ${statusClass}">${task.status === 'running' ? iconMarkup('loader') : ''}${escapeHtml(taskLabels[task.status])}</span>
       <span class="hide-tablet data-cell-muted">${escapeHtml(formatTime(task.updatedAt))}</span>
-      <div class="data-row-actions"><button class="icon-btn" type="button" data-task-id="${escapeHtml(task.id)}" aria-label="查看任务详情">${iconMarkup('chevron-right')}</button></div>
+      <div class="data-row-actions">${cancel}${retry}<button class="icon-btn" type="button" data-task-id="${escapeHtml(task.id)}" aria-label="查看任务详情">${iconMarkup('chevron-right')}</button></div>
     </article>`
   }).join('')
   renderIcons(container)

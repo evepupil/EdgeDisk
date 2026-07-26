@@ -1,7 +1,7 @@
-﻿import { desc, eq } from 'drizzle-orm'
+﻿import { desc, eq, inArray } from 'drizzle-orm'
 import { getDb } from '../../db/client.ts'
 import { importTasks, type ImportTaskRow } from '../../db/schema.ts'
-import type { Env } from '../types.ts'
+import type { Env, ImportTaskStatus } from '../types.ts'
 
 export type ImportTaskPatch = Partial<typeof importTasks.$inferInsert>
 
@@ -29,4 +29,13 @@ export async function findImportTaskRow(env: Env, taskId: string): Promise<Impor
 export async function updateImportTask(env: Env, taskId: string, patch: ImportTaskPatch) {
   const db = getDb(env)
   await db.update(importTasks).set(patch).where(eq(importTasks.id, taskId))
+}
+
+export async function deleteImportTasksByStatus(env: Env, statuses: readonly ImportTaskStatus[]): Promise<number> {
+  if (!statuses.length) return 0
+  const db = getDb(env)
+  const rows = await db.select({ id: importTasks.id }).from(importTasks).where(inArray(importTasks.status, [...statuses]))
+  if (!rows.length) return 0
+  await db.delete(importTasks).where(inArray(importTasks.status, [...statuses]))
+  return rows.length
 }

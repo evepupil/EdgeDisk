@@ -112,7 +112,8 @@ npx wrangler d1 execute edgedisk --remote --file migrations/0001_import_tasks.sq
 - `/api/folder`
 - `/api/move`
 - `/api/import-url`
-- `/api/import-tasks`
+- `/api/import-tasks`（`GET` 列表、`DELETE` 清空已结束任务）
+- `/api/import-tasks/cancel`、`/api/import-tasks/retry`
 - `/api/share`
 - `/api/shares`
 
@@ -129,7 +130,6 @@ npx wrangler d1 execute edgedisk --remote --file migrations/0001_import_tasks.sq
 
 ## 后续还值得做
 
-- 给导入任务加“失败重试 / 取消任务”
 - 为分享加入访问密码、下载日志、限速策略
 - 全盘搜索（服务端索引）与存储用量统计
 - 大目录虚拟滚动、目录路径同步到 URL

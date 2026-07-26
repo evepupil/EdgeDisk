@@ -2,7 +2,7 @@ import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
 export const importTasks = sqliteTable("import_tasks", {
   id: text("id").primaryKey(),
-  status: text("status", { enum: ["queued", "running", "succeeded", "failed"] }).notNull(),
+  status: text("status", { enum: ["queued", "running", "succeeded", "failed", "canceled"] }).notNull(),
   sourceUrl: text("source_url").notNull(),
   directory: text("directory").notNull(),
   requestedFileName: text("requested_file_name"),

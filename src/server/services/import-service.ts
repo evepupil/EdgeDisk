@@ -4,12 +4,19 @@ import { importFromUrl, type ImportInput, RetryableImportError } from '../import
 import { normalizeDirectoryPath, toPositiveInteger } from '../path.ts'
 import {
   deleteImportTask,
+  deleteImportTasksByStatus,
   findImportTaskRow,
   insertImportTask,
   listImportTaskRows,
   updateImportTask
 } from '../repos/import-task-repo.ts'
 import type { Env, ImportQueueMessage, ImportTask, ImportTaskStatus } from '../types.ts'
+import {
+  FINISHED_STATUSES,
+  canCancelImportTask,
+  canRetryImportTask,
+  shouldSkipImportMessage
+} from './import-task-status.ts'
 
 const MAX_QUEUE_ATTEMPTS = 5
 const DEFAULT_TASK_LIST_LIMIT = 12
@@ -83,6 +90,74 @@ export async function getImportTaskById(env: Env, taskId: string) {
   return row ? serializeImportTask(row) : null
 }
 
+async function requireImportTask(env: Env, taskId: string): Promise<ImportTask> {
+  const task = await getImportTaskById(env, taskId)
+  if (!task) throw new HttpError(404, '导入任务不存在')
+  return task
+}
+
+/**
+ * 取消导入任务。
+ *
+ * 排队中的任务取消是干净的：消费者拿到消息时会看到 `canceled` 并直接跳过。
+ * 已经在跑的任务只能「尽力取消」——正在飞的 fetch 无法中断，所以下载完成后
+ * 消费者会回查状态，发现已取消就把刚写进 R2 的文件删掉。
+ */
+export async function cancelImportTask(env: Env, taskId: string) {
+  const task = await requireImportTask(env, taskId)
+  if (!canCancelImportTask(task.status)) {
+    throw new HttpError(409, `当前状态（${task.status}）无法取消`)
+  }
+
+  const now = new Date().toISOString()
+  await updateImportTask(env, task.id, {
+    status: 'canceled',
+    error: null,
+    updatedAt: now,
+    finishedAt: now
+  })
+  return { canceled: true, id: task.id, wasRunning: task.status === 'running' }
+}
+
+export async function retryImportTask(env: Env, taskId: string) {
+  const task = await requireImportTask(env, taskId)
+  if (!canRetryImportTask(task.status)) {
+    throw new HttpError(409, `当前状态（${task.status}）无法重试`)
+  }
+
+  const queue = requireImportQueue(env)
+  const now = new Date().toISOString()
+  await updateImportTask(env, task.id, {
+    status: 'queued',
+    attempts: 0,
+    error: null,
+    updatedAt: now,
+    startedAt: null,
+    finishedAt: null
+  })
+
+  try {
+    await queue.send({ taskId: task.id })
+  } catch (error) {
+    // 入队失败就把状态还原成失败，否则任务会永远停在「排队中」等一条不存在的消息。
+    const failedAt = new Date().toISOString()
+    await updateImportTask(env, task.id, {
+      status: 'failed',
+      error: error instanceof Error ? `重新入队失败：${error.message}` : '重新入队失败',
+      updatedAt: failedAt,
+      finishedAt: failedAt
+    })
+    throw new HttpError(500, '导入任务重新入队失败')
+  }
+
+  return await requireImportTask(env, task.id)
+}
+
+export async function clearFinishedImportTasks(env: Env) {
+  const cleared = await deleteImportTasksByStatus(env, FINISHED_STATUSES)
+  return { cleared }
+}
+
 export async function consumeImportQueue(batch: MessageBatch<ImportQueueMessage>, env: Env) {
   if (!env.IMPORTS_DB) {
     console.error('IMPORTS_DB binding missing, retrying batch')
@@ -104,7 +179,7 @@ async function consumeImportMessage(message: Message<ImportQueueMessage>, env: E
   }
 
   const task = await getImportTaskById(env, parsedMessage.data.taskId)
-  if (!task || task.status === 'succeeded') {
+  if (!task || shouldSkipImportMessage(task.status)) {
     message.ack()
     return
   }
@@ -125,6 +200,15 @@ async function consumeImportMessage(message: Message<ImportQueueMessage>, env: E
       fileName: task.requestedFileName || undefined,
       overwrite: task.overwrite
     })
+
+    // 下载期间可能被取消。无法中断已经开始的 fetch，只能事后把落地的文件清掉。
+    const latest = await getImportTaskById(env, task.id)
+    if (latest?.status === 'canceled') {
+      await env.DISK.delete(result.path)
+      message.ack()
+      return
+    }
+
     const now = new Date().toISOString()
     await updateImportTask(env, task.id, {
       status: 'succeeded',
@@ -140,6 +224,14 @@ async function consumeImportMessage(message: Message<ImportQueueMessage>, env: E
     message.ack()
   } catch (error) {
     const errorMessage = truncateErrorMessage(error)
+
+    // 下载失败的同时可能已经被取消，别把 canceled 覆盖成 failed 或重新入队。
+    const latest = await getImportTaskById(env, task.id)
+    if (latest?.status === 'canceled') {
+      message.ack()
+      return
+    }
+
     if (shouldRetryImport(error, message.attempts)) {
       await updateImportTask(env, task.id, {
         status: 'queued',
