@@ -1,7 +1,9 @@
 import { baseName, escapeHtml, formatBytes, formatTime, getItemIcon, getMediaType } from '../shared/format'
 import { iconMarkup, renderIcons } from '../shared/icons'
+import { bytesPerSecond, estimateSeconds, formatDuration, formatPercent, formatSpeed } from '../shared/upload-plan'
 import type { ImportTask, ListedItem, ObjectDetail, ShareItem, TrashItem } from '../shared/types'
 import type { DashboardElements } from './elements'
+import type { UploadFileState, UploadSnapshot } from './uploader'
 
 const numberFormat = new Intl.NumberFormat('zh-CN')
 const taskLabels: Record<ImportTask['status'], string> = { queued: '排队中', running: '导入中', succeeded: '已完成', failed: '失败' }
@@ -126,6 +128,60 @@ export function renderImportTaskDetail(container: HTMLDListElement, task: Import
     ['创建时间', formatTime(task.createdAt)], ['开始时间', formatTime(task.startedAt)], ['完成时间', formatTime(task.finishedAt)], ['错误信息', task.error || '-'],
   ]
   container.innerHTML = rows.map(([label, value]) => `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd></div>`).join('')
+}
+
+const uploadStatusIcon: Record<UploadFileState['status'], string> = {
+  pending: 'file',
+  uploading: 'loader',
+  done: 'check',
+  failed: 'circle-alert',
+  canceled: 'circle-x'
+}
+
+export function renderUploadActivity(elements: DashboardElements, snapshot: UploadSnapshot): void {
+  const percent = formatPercent(snapshot.uploadedBytes, snapshot.totalBytes)
+  elements.uploadProgress.style.width = `${percent}%`
+  elements.uploadPercent.textContent = `${percent}%`
+
+  const total = snapshot.files.length
+  if (snapshot.finished) {
+    const canceled = snapshot.files.filter((file) => file.status === 'canceled').length
+    elements.uploadTitle.textContent = snapshot.failed || canceled ? '上传结束，部分文件未完成' : '上传完成'
+    elements.uploadMeta.textContent = [
+      `成功 ${snapshot.done} / ${total}`,
+      snapshot.failed ? `失败 ${snapshot.failed}` : '',
+      canceled ? `已取消 ${canceled}` : '',
+      `共 ${formatBytes(snapshot.uploadedBytes)}`
+    ].filter(Boolean).join(' · ')
+  } else {
+    const speed = bytesPerSecond(snapshot.uploadedBytes, snapshot.elapsedMs)
+    const remaining = estimateSeconds(snapshot.uploadedBytes, snapshot.totalBytes, snapshot.elapsedMs)
+    elements.uploadTitle.textContent = `正在上传 ${snapshot.done + 1} / ${total}`
+    elements.uploadMeta.textContent = [
+      `${formatBytes(snapshot.uploadedBytes)} / ${formatBytes(snapshot.totalBytes)}`,
+      formatSpeed(speed),
+      `剩余 ${formatDuration(remaining)}`
+    ].join(' · ')
+  }
+
+  elements.uploadList.innerHTML = snapshot.files.map(renderUploadRow).join('')
+  renderIcons(elements.uploadList)
+}
+
+function renderUploadRow(file: UploadFileState): string {
+  const percent = formatPercent(file.uploadedBytes, file.size)
+  const meta = file.status === 'failed'
+    ? escapeHtml(file.error || '失败')
+    : file.status === 'canceled'
+      ? '已取消'
+      : file.status === 'done'
+        ? escapeHtml(formatBytes(file.size))
+        : `${percent}%`
+  return `<div class="upload-row ${file.status}">
+    <div class="upload-row-name">${iconMarkup(uploadStatusIcon[file.status])}<span title="${escapeHtml(file.path)}">${escapeHtml(file.name)}</span></div>
+    <div class="upload-row-bar"><span style="width: ${file.status === 'done' ? 100 : percent}%"></span></div>
+    <div class="upload-row-meta">${meta}</div>
+  </div>`
 }
 
 function renderTableRow(item: ListedItem, selected: boolean): string {

@@ -5,6 +5,7 @@ export interface Env {
   ADMIN_EMAIL?: string;
   MAX_LIST_KEYS?: string;
   IMPORT_MAX_BYTES?: string;
+  UPLOAD_PART_BYTES?: string;
   DISABLE_ACCESS_AUTH?: string;
   IMPORTS_DB?: D1Database;
   IMPORT_QUEUE?: Queue<ImportQueueMessage>;

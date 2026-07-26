@@ -106,7 +106,9 @@ npx wrangler d1 execute edgedisk --remote --file migrations/0001_import_tasks.sq
 - `/api/list`（支持 `prefix`、`cursor`、`limit`；超过一页时返回 `cursor` 供继续翻页）
 - `/api/object`
 - `/api/file`
-- `/api/upload`
+- `/api/upload/config`（片大小、最大片数、单文件上限）
+- `/api/upload/direct`（`PUT`，小文件流式直传）
+- `/api/upload/multipart`、`/api/upload/multipart/part`、`/api/upload/multipart/complete`、`/api/upload/multipart/abort`（大文件分片上传）
 - `/api/folder`
 - `/api/move`
 - `/api/import-url`
@@ -127,7 +129,8 @@ npx wrangler d1 execute edgedisk --remote --file migrations/0001_import_tasks.sq
 
 ## 后续还值得做
 
-- 把 `app/client/dashboard.ts` 再细分成更小的模块
 - 给导入任务加“失败重试 / 取消任务”
 - 为分享加入访问密码、下载日志、限速策略
-- 为文件列表加入搜索、排序、批量操作
+- 全盘搜索（服务端索引）与存储用量统计
+- 大目录虚拟滚动、目录路径同步到 URL
+- 文件夹拖放上传（当前只支持按钮选择文件夹）

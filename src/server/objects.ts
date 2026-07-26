@@ -1,7 +1,7 @@
 import { HttpError } from "./errors.ts";
-import { applyDownloadHeaders, inferContentType } from "./file-http.ts";
+import { applyDownloadHeaders } from "./file-http.ts";
 import { TRASH_PREFIX } from "./storage.ts";
-import { baseName, joinPath, normalizeRelativeFilePath, toPositiveInteger } from "./path.ts";
+import { baseName, joinPath, toPositiveInteger } from "./path.ts";
 import type { Env, ListedFile, ListedFolder } from "./types.ts";
 
 export const FOLDER_MARKER = ".__edgedisk_folder__";
@@ -88,24 +88,6 @@ export async function getObjectDetail(env: Env, path: string) {
     contentType: head.httpMetadata?.contentType || null,
     etag: head.httpEtag || head.etag || null
   };
-}
-
-export async function handleUpload(formData: FormData, env: Env, basePath: string) {
-  const files = formData.getAll("files");
-  const paths = formData.getAll("paths").map((item) => String(item));
-  if (!files.length) throw new HttpError(400, "没有收到任何文件");
-  if (files.length !== paths.length) throw new HttpError(400, "上传路径和文件数量不一致");
-
-  let uploaded = 0;
-  for (let index = 0; index < files.length; index += 1) {
-    const file = files[index];
-    if (!file || typeof file !== "object" || typeof (file as Blob).stream !== "function") continue;
-    const upload = file as File;
-    const key = joinPath(basePath, normalizeRelativeFilePath(paths[index] || upload.name));
-    await env.DISK.put(key, upload.stream(), { httpMetadata: { contentType: inferContentType(upload.type, key) } });
-    uploaded += 1;
-  }
-  return { uploaded };
 }
 
 export async function createFolder(env: Env, folderPath: string) {

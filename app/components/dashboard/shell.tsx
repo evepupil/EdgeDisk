@@ -81,7 +81,20 @@ function FilePanel() {
         <DetailPanel />
       </div>
 
-      <div class="activity-bar hidden" id="uploadActivity" aria-live="polite"><div class="activity-copy"><Icon name="upload-cloud" /><div><strong id="uploadTitle">正在上传</strong><span id="uploadMeta" /></div></div><div class="progress-track"><span id="uploadProgress" /></div><button class="btn ghost icon-only" id="hideUploadActivity" type="button" aria-label="收起上传状态"><Icon name="x" /></button></div>
+      <div class="activity-bar hidden" id="uploadActivity" aria-live="polite">
+        <div class="activity-head">
+          <div class="activity-copy"><Icon name="upload-cloud" /><div><strong id="uploadTitle">正在上传</strong><span id="uploadMeta" /></div></div>
+          <div class="activity-actions">
+            <button class="btn quiet" id="cancelUpload" type="button"><Icon name="circle-x" />取消上传</button>
+            <button class="btn ghost icon-only" id="hideUploadActivity" type="button" aria-label="收起上传状态"><Icon name="x" /></button>
+          </div>
+        </div>
+        <div class="activity-progress">
+          <div class="progress-track"><span id="uploadProgress" /></div>
+          <span class="activity-percent" id="uploadPercent">0%</span>
+        </div>
+        <div class="upload-list" id="uploadList" />
+      </div>
     </section>
   )
 }

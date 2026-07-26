@@ -5,7 +5,8 @@ import { iconMarkup, renderIcons } from '../shared/icons'
 import { collectPages } from '../shared/paging'
 import type { DirectoryData, ImportTask, ListedItem, ObjectDetail, ShareItem, ShareTarget, SortMode, TrashItem, ViewMode } from '../shared/types'
 import { getDashboardElements } from './elements'
-import { renderCrumbs, renderDetail, renderDirectory, renderImportTaskDetail, renderImportTasks, renderShares, renderTrashItems, updateSelectionView } from './view'
+import { createUploader } from './uploader'
+import { renderCrumbs, renderDetail, renderDirectory, renderImportTaskDetail, renderImportTasks, renderShares, renderTrashItems, renderUploadActivity, updateSelectionView } from './view'
 
 const viewStorageKey = 'edgedisk:view-mode'
 
@@ -260,31 +261,36 @@ export function initDashboard(): void {
     await loadShares()
   }
 
+  const uploader = createUploader({
+    onSnapshot: (snapshot) => renderUploadActivity(elements, snapshot)
+  })
+
   const upload = async (files: File[]): Promise<void> => {
     if (!files.length) return
-    const formData = new FormData()
-    formData.append('basePath', state.prefix)
-    for (const file of files) {
-      formData.append('files', file, file.name)
-      formData.append('paths', file.webkitRelativePath || file.name)
+    if (uploader.isRunning()) {
+      setStatus('已有上传任务在进行，请等它结束或先取消', 'warning')
+      return
     }
-    elements.uploadTitle.textContent = `正在上传 ${files.length} 个文件`
-    elements.uploadMeta.textContent = files.map((file) => file.name).slice(0, 2).join('、')
-    elements.uploadProgress.style.width = '32%'
+
+    const items = files.map((file) => ({
+      file,
+      // 选文件夹时 webkitRelativePath 带相对目录，要保留层级；拖放或选单个文件时只有文件名。
+      path: `${state.prefix}${normalizeInputPath(file.webkitRelativePath || file.name)}`
+    }))
+
     elements.uploadActivity.classList.remove('hidden')
+    elements.cancelUpload.disabled = false
     setStatus(`正在上传 ${files.length} 个文件...`)
-    try {
-      const result = await requestJson<{ uploaded: number }>('/api/upload', { method: 'POST', body: formData })
-      elements.uploadProgress.style.width = '100%'
-      elements.uploadTitle.textContent = '上传完成'
-      elements.uploadMeta.textContent = `${result.uploaded} 个文件已写入当前目录`
-      setStatus(`上传完成：${result.uploaded} 个文件`, 'success')
-      await loadDirectory(state.prefix)
-    } catch (error) {
-      elements.uploadTitle.textContent = '上传失败'
-      elements.uploadMeta.textContent = getErrorMessage(error, '请稍后重试')
-      setStatus(getErrorMessage(error, '上传失败'), 'error')
-    }
+
+    const snapshot = await uploader.start(items)
+    elements.cancelUpload.disabled = true
+
+    if (snapshot.canceled) setStatus(`上传已取消，已完成 ${snapshot.done} 个文件`, 'warning')
+    else if (snapshot.failed) setStatus(`上传结束：成功 ${snapshot.done} 个，失败 ${snapshot.failed} 个`, 'error')
+    else setStatus(`上传完成：${snapshot.done} 个文件`, 'success')
+
+    // 只要有文件落地就刷新目录，取消和部分失败同样需要看到已经传上去的部分。
+    if (snapshot.done > 0) await loadDirectory(state.prefix)
   }
 
   const loadImportTasks = async (silent = false): Promise<void> => {
@@ -413,6 +419,10 @@ export function initDashboard(): void {
   elements.refresh.addEventListener('click', () => void loadDirectory(state.prefix))
   elements.closeDetail.addEventListener('click', closeDetail)
   elements.hideUploadActivity.addEventListener('click', () => elements.uploadActivity.classList.add('hidden'))
+  elements.cancelUpload.addEventListener('click', () => {
+    uploader.cancel()
+    elements.cancelUpload.disabled = true
+  })
 
   elements.newFolderButton.addEventListener('click', () => {
     elements.folderLocation.textContent = `将在 /${state.prefix} 中创建`

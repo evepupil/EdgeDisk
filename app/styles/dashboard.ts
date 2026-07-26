@@ -23,7 +23,7 @@ export const dashboardStyles = `
 
   .main-area { min-width: 0; padding: 18px; }
   .app-panel { min-width: 0; }
-  .page-heading, .file-toolbar, .selection-bar, .selection-actions, .activity-bar { display: flex; min-width: 0; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+  .page-heading, .file-toolbar, .selection-bar, .selection-actions { display: flex; min-width: 0; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
   .page-heading { margin-bottom: 18px; }
   .heading-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 10px; }
   .file-picker { cursor: pointer; }
@@ -65,12 +65,30 @@ export const dashboardStyles = `
   .detail-list dd { min-width: 0; margin: 0; overflow-wrap: anywhere; }
   .detail-actions { display: grid; gap: 6px; margin-top: 14px; }
 
-  .activity-bar { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border); }
+  .activity-bar { display: grid; gap: 10px; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border); }
+  .activity-head { display: flex; min-width: 0; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+  .activity-actions { display: flex; flex: none; align-items: center; gap: 6px; }
   .activity-copy { display: flex; min-width: 0; align-items: center; gap: 10px; }
   .activity-copy > div { display: grid; min-width: 0; }
   .activity-copy span { color: var(--muted-foreground); font-size: 12px; }
+  .activity-progress { display: flex; align-items: center; gap: 10px; }
+  .activity-percent { flex: none; min-width: 40px; color: var(--muted-foreground); font-size: 12px; font-variant-numeric: tabular-nums; text-align: right; }
   .progress-track { width: min(180px, 100%); height: 5px; overflow: hidden; border-radius: 3px; background: var(--muted); }
   .progress-track span { display: block; width: 0; height: 100%; background: var(--primary); transition: width .2s ease; }
+  .activity-progress .progress-track { flex: 1; width: auto; }
+
+  .upload-list { display: grid; gap: 6px; max-height: 170px; overflow-y: auto; }
+  .upload-row { display: grid; grid-template-columns: minmax(0, 1fr) 90px 76px; align-items: center; gap: 10px; font-size: 12px; }
+  .upload-row-name { display: flex; min-width: 0; align-items: center; gap: 6px; }
+  .upload-row-name span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .upload-row-name .icon { flex: none; }
+  .upload-row-bar { height: 4px; overflow: hidden; border-radius: 2px; background: var(--muted); }
+  .upload-row-bar span { display: block; width: 0; height: 100%; background: var(--primary); transition: width .2s ease; }
+  .upload-row-meta { color: var(--muted-foreground); font-variant-numeric: tabular-nums; text-align: right; }
+  .upload-row.uploading .upload-row-name .icon { animation: edgedisk-spin 1s linear infinite; }
+  .upload-row.failed .upload-row-meta, .upload-row.failed .upload-row-name .icon { color: var(--destructive); }
+  .upload-row.failed .upload-row-bar span { background: var(--destructive); }
+  .upload-row.canceled { opacity: .55; }
 
   .data-list { display: grid; border-top: 1px solid var(--border); }
   .data-list.compact { max-height: 260px; overflow: auto; }
@@ -113,6 +131,8 @@ export const dashboardStyles = `
     .hide-mobile, .size-cell { display: none; }
     .selection-actions { width: 100%; justify-content: flex-start; }
     .data-row { grid-template-columns: minmax(0, 1fr) auto; }
-    .progress-track { order: 3; width: 100%; }
+    .activity-head { align-items: flex-start; }
+    .upload-row { grid-template-columns: minmax(0, 1fr) 70px; }
+    .upload-row-bar { display: none; }
   }
 `

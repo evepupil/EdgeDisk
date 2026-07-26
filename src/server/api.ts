@@ -4,10 +4,19 @@ import { z } from 'zod'
 import { requireAdmin } from './auth'
 import { HttpError, respondError } from './errors'
 import { createImportTask, listImportTasks } from './services/import-service.ts'
-import { createFolder, getObjectDetail, handleUpload, listDirectory, moveObject, streamObject } from './objects'
+import { createFolder, getObjectDetail, listDirectory, moveObject, streamObject } from './objects'
 import { normalizeAnyPath, normalizeDirectoryPath, normalizeFilePath, parseOptionalNonNegativeNumber } from './path'
 import { createShare, listSharesByTarget, retargetSharesForMove, revokeShare, revokeSharesForPath } from './shares'
 import { listTrashItems, moveToTrash, permanentlyDeleteTrashItem, restoreTrashItem } from './trash'
+import {
+  abortMultipartUpload,
+  assertWritableFilePath,
+  beginMultipartUpload,
+  completeMultipartUpload,
+  getUploadConfig,
+  putDirectObject,
+  uploadMultipartPart
+} from './uploads'
 import type { Env, SessionInfo } from './types'
 
 const pathQuerySchema = z.object({ path: z.string().trim().min(1, '\u7f3a\u5c11 path \u53c2\u6570') })
@@ -35,6 +44,25 @@ const shareDeleteSchema = z.object({ code: z.string().trim().min(1, '\u7f3a\u5c1
 const sharesQuerySchema = z.object({
   kind: z.enum(['file', 'folder']),
   path: z.string().trim().min(1, '\u7f3a\u5c11 path \u53c2\u6570')
+})
+const uploadTargetSchema = z.object({ path: z.string().trim().min(1, '\u7f3a\u5c11 path \u53c2\u6570') })
+const uploadPartQuerySchema = z.object({
+  path: z.string().trim().min(1, '\u7f3a\u5c11 path \u53c2\u6570'),
+  uploadId: z.string().trim().min(1, '\u7f3a\u5c11 uploadId \u53c2\u6570'),
+  partNumber: z.coerce.number().int().positive('\u5206\u7247\u5e8f\u53f7\u4e0d\u5408\u6cd5')
+})
+const uploadedPartSchema = z.object({
+  partNumber: z.number().int().positive(),
+  etag: z.string().trim().min(1)
+})
+const uploadCompleteSchema = z.object({
+  path: z.string().trim().min(1, '\u7f3a\u5c11 path \u53c2\u6570'),
+  uploadId: z.string().trim().min(1, '\u7f3a\u5c11 uploadId \u53c2\u6570'),
+  parts: z.array(uploadedPartSchema).min(1, '\u5206\u7247\u5217\u8868\u4e3a\u7a7a')
+})
+const uploadAbortSchema = z.object({
+  path: z.string().trim().min(1, '\u7f3a\u5c11 path \u53c2\u6570'),
+  uploadId: z.string().trim().min(1, '\u7f3a\u5c11 uploadId \u53c2\u6570')
 })
 
 type ApiEnv = {
@@ -105,10 +133,36 @@ api.get('/file', zValidator('query', fileQuerySchema), async (c) => {
   return await streamObject(c.env, normalizeFilePath(query.path), query.download === '1', c.req.raw)
 })
 
-api.post('/upload', async (c) => {
-  const formData = await c.req.formData()
-  const basePath = normalizeDirectoryPath(String(formData.get('basePath') || ''))
-  return c.json(await handleUpload(formData, c.env, basePath), 201)
+/** 上传目标 key 统一走这里：先规范化路径，再挡住内部保留路径。 */
+const uploadKey = (path: string): string => assertWritableFilePath(normalizeFilePath(path))
+
+api.get('/upload/config', (c) => c.json(getUploadConfig(c.env)))
+
+api.put('/upload/direct', zValidator('query', uploadTargetSchema), async (c) => {
+  const query = c.req.valid('query')
+  const result = await putDirectObject(c.env, uploadKey(query.path), c.req.raw.body, c.req.header('content-type') || null)
+  return c.json(result, 201)
+})
+
+api.post('/upload/multipart', zValidator('json', uploadTargetSchema), async (c) => {
+  const payload = c.req.valid('json')
+  const result = await beginMultipartUpload(c.env, uploadKey(payload.path), c.req.header('x-file-content-type') || null)
+  return c.json(result, 201)
+})
+
+api.put('/upload/multipart/part', zValidator('query', uploadPartQuerySchema), async (c) => {
+  const query = c.req.valid('query')
+  return c.json(await uploadMultipartPart(c.env, uploadKey(query.path), query.uploadId, query.partNumber, c.req.raw.body))
+})
+
+api.post('/upload/multipart/complete', zValidator('json', uploadCompleteSchema), async (c) => {
+  const payload = c.req.valid('json')
+  return c.json(await completeMultipartUpload(c.env, uploadKey(payload.path), payload.uploadId, payload.parts), 201)
+})
+
+api.post('/upload/multipart/abort', zValidator('json', uploadAbortSchema), async (c) => {
+  const payload = c.req.valid('json')
+  return c.json(await abortMultipartUpload(c.env, uploadKey(payload.path), payload.uploadId))
 })
 
 api.post('/folder', zValidator('json', folderSchema), async (c) => {

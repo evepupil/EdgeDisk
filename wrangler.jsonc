@@ -37,7 +37,10 @@
   "vars": {
     "APP_NAME": "EdgeDisk",
     "MAX_LIST_KEYS": "1000",
-    "IMPORT_MAX_BYTES": "536870912"
+    "IMPORT_MAX_BYTES": "536870912",
+    // 分片上传的单片大小。R2 要求不小于 5 MiB，单次最多 10000 片，
+    // 所以 16 MiB 对应的单文件上限约 156 GB。
+    "UPLOAD_PART_BYTES": "16777216"
   },
   "compatibility_flags": [
     "nodejs_compat"
