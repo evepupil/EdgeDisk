@@ -6,7 +6,7 @@ import { collectPages } from '../shared/paging'
 import type { DirectoryData, ImportTask, ListedItem, ObjectDetail, ShareItem, ShareTarget, SortMode, TrashItem, ViewMode } from '../shared/types'
 import { getDashboardElements } from './elements'
 import { createUploader } from './uploader'
-import { renderCrumbs, renderDetail, renderDirectory, renderImportTaskDetail, renderImportTasks, renderShares, renderTrashItems, renderUploadActivity, updateSelectionView } from './view'
+import { renderAllShares, renderCrumbs, renderDetail, renderDirectory, renderImportTaskDetail, renderImportTasks, renderShares, renderTrashItems, renderUploadActivity, updateSelectionView, updateShareSelectionView } from './view'
 
 const viewStorageKey = 'edgedisk:view-mode'
 
@@ -21,6 +21,8 @@ type DashboardState = {
   deleteTargets: ShareTarget[]
   permanentDeleteId: string | null
   importTasks: ImportTask[]
+  allShares: ShareItem[]
+  selectedShares: Set<string>
   trashItems: TrashItem[]
   viewMode: ViewMode
   sort: SortMode
@@ -44,6 +46,8 @@ export function initDashboard(): void {
     deleteTargets: [],
     permanentDeleteId: null,
     importTasks: [],
+    allShares: [],
+    selectedShares: new Set<string>(),
     trashItems: [],
     viewMode: storedView === 'icon' ? 'icon' : 'table',
     sort: 'name',
@@ -341,6 +345,60 @@ export function initDashboard(): void {
     }
   }
 
+  const refreshShareSelection = (): void => {
+    // 撤销或刷新后，已经不存在的分享码要从选择集里剔掉，否则批量撤销会带上幽灵条目。
+    const alive = new Set(state.allShares.map((share) => share.code))
+    for (const code of [...state.selectedShares]) if (!alive.has(code)) state.selectedShares.delete(code)
+    renderAllShares(elements.allSharesList, state.allShares, state.selectedShares)
+    updateShareSelectionView(elements, state.selectedShares)
+  }
+
+  const loadAllShares = async (silent = false): Promise<void> => {
+    if (!silent) setStatus('正在加载分享列表...', '', elements.allSharesStatus)
+    try {
+      const data = await requestJson<{ shares: ShareItem[]; expiredRemoved: number; truncated: boolean }>('/api/shares/all?limit=200')
+      state.allShares = data.shares
+      elements.shareNavCount.textContent = String(data.shares.length)
+      refreshShareSelection()
+      const notes = [
+        data.expiredRemoved ? `已清理 ${data.expiredRemoved} 个过期分享` : '',
+        data.truncated ? '分享数量较多，仅显示前 200 个' : '',
+      ].filter(Boolean)
+      setStatus(notes.join('；'), data.truncated ? 'warning' : '', elements.allSharesStatus)
+    } catch (error) {
+      setStatus(getErrorMessage(error, '加载分享列表失败'), 'error', elements.allSharesStatus)
+    }
+  }
+
+  const revokeShareFromPanel = async (code: string): Promise<void> => {
+    try {
+      await requestJson(`/api/share?code=${encodeURIComponent(code)}`, { method: 'DELETE' })
+      setStatus('分享已撤销', 'success', elements.allSharesStatus)
+      await loadAllShares(true)
+    } catch (error) {
+      setStatus(getErrorMessage(error, '撤销分享失败'), 'error', elements.allSharesStatus)
+    }
+  }
+
+  const revokeSelectedShares = async (): Promise<void> => {
+    const codes = [...state.selectedShares]
+    if (!codes.length) return
+    try {
+      const result = await requestJson<{ revoked: number; missing: string[] }>('/api/shares/revoke-batch', {
+        method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ codes }),
+      })
+      state.selectedShares.clear()
+      setStatus(
+        result.missing.length ? `已撤销 ${result.revoked} 个，${result.missing.length} 个已失效` : `已撤销 ${result.revoked} 个分享`,
+        'success',
+        elements.allSharesStatus
+      )
+      await loadAllShares(true)
+    } catch (error) {
+      setStatus(getErrorMessage(error, '批量撤销失败'), 'error', elements.allSharesStatus)
+    }
+  }
+
   const loadTrash = async (silent = false): Promise<void> => {
     if (!silent) setStatus('正在加载回收站...', '', elements.trashStatus)
     try {
@@ -380,6 +438,7 @@ export function initDashboard(): void {
     for (const panel of document.querySelectorAll<HTMLElement>('.app-panel')) panel.classList.toggle('hidden', panel.id !== targetId)
     for (const button of document.querySelectorAll<HTMLButtonElement>('[data-panel-target]')) button.classList.toggle('active', button.dataset.panelTarget === targetId)
     if (targetId === 'importsPanel') void loadImportTasks()
+    if (targetId === 'sharesPanel') void loadAllShares()
     if (targetId === 'trashPanel') void loadTrash()
   }
 
@@ -518,6 +577,30 @@ export function initDashboard(): void {
       .catch(() => setStatus('复制失败，请手动复制', 'error'))
   })
 
+  elements.refreshAllShares.addEventListener('click', () => void loadAllShares())
+  elements.revokeSelectedShares.addEventListener('click', () => void revokeSelectedShares())
+  elements.allSharesList.addEventListener('change', (event) => {
+    const checkbox = event.target instanceof HTMLInputElement ? event.target.closest<HTMLInputElement>('[data-share-pick]') : null
+    const code = checkbox?.dataset.sharePick
+    if (!checkbox || !code) return
+    if (checkbox.checked) state.selectedShares.add(code)
+    else state.selectedShares.delete(code)
+    updateShareSelectionView(elements, state.selectedShares)
+  })
+  elements.allSharesList.addEventListener('click', (event) => {
+    const copyUrl = closestElement(event.target, '[data-copy-url]')?.dataset.copyUrl
+    if (copyUrl) {
+      void navigator.clipboard.writeText(copyUrl)
+        .then(() => setStatus('分享链接已复制', 'success', elements.allSharesStatus))
+        .catch(() => setStatus('复制失败，请手动复制', 'error', elements.allSharesStatus))
+      return
+    }
+    const openUrl = closestElement(event.target, '[data-share-open]')?.dataset.shareOpen
+    if (openUrl) { window.open(openUrl, '_blank', 'noopener'); return }
+    const revoke = closestElement(event.target, '[data-revoke]')?.dataset.revoke
+    if (revoke) void revokeShareFromPanel(revoke)
+  })
+
   elements.refreshImports.addEventListener('click', () => void loadImportTasks())
   elements.refreshTrash.addEventListener('click', () => void loadTrash())
   elements.clearFinishedImports.addEventListener('click', () => void clearFinishedImports())
@@ -567,6 +650,7 @@ export function initDashboard(): void {
     requestJson<{ email: string }>('/api/session').then((session) => { elements.who.textContent = session.email }),
     loadDirectory(''),
     loadImportTasks(true),
+    loadAllShares(true),
     loadTrash(true),
   ]).catch((error: unknown) => setStatus(getErrorMessage(error, '初始化失败'), 'error'))
 

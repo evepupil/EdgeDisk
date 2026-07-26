@@ -50,13 +50,26 @@ export async function listSharesByTarget(env: Env, kind: ShareKind, path: string
   return shares;
 }
 
+/**
+ * 分享是否已过期。
+ *
+ * KV 的 `put` 没有用 `expirationTtl`，过期判断完全在应用层做，所以每个读路径
+ * 都必须走这个判断，并顺手把过期记录清掉。
+ */
+export function isExpiredShare(record: ShareRecord, now = Date.now()): boolean {
+  if (!record.expiresAt) return false;
+  const expiresAt = new Date(record.expiresAt).getTime();
+  if (Number.isNaN(expiresAt)) return false;
+  return expiresAt <= now;
+}
+
 export async function getShareRecord(env: Env, shareCode: string): Promise<ShareRecord> {
   if (!/^[A-Za-z0-9_-]{6,20}$/.test(shareCode)) throw new HttpError(404, "分享不存在");
   const raw = await env.SHARES.get(shareStorageKey(shareCode));
   if (!raw) throw new HttpError(404, "分享不存在或已失效");
 
   const record = JSON.parse(raw) as ShareRecord;
-  if (record.expiresAt && new Date(record.expiresAt).getTime() <= Date.now()) {
+  if (isExpiredShare(record)) {
     await revokeShare(env, shareCode, record);
     throw new HttpError(404, "分享已过期");
   }
@@ -142,9 +155,7 @@ export async function streamSharedObject(env: Env, shareCode: string, rawRelativ
 }
 
 export async function revokeSharesForPath(env: Env, path: string, recursiveFolder: boolean): Promise<number> {
-  const prefixes = recursiveFolder
-    ? [`share-target:file:${encodePathForShareKey(path)}`, `share-target:folder:${encodePathForShareKey(path)}`]
-    : [shareTargetIndexPrefix("file", path)];
+  const prefixes = shareTargetSearchPrefixes(path, recursiveFolder);
 
   const seen = new Set<string>();
   let revoked = 0;
@@ -159,14 +170,23 @@ export async function revokeSharesForPath(env: Env, path: string, recursiveFolde
   return revoked;
 }
 
+/**
+ * 移动对象后修正受影响分享的目标路径。
+ *
+ * 以前这里全量扫 `share:` 键空间，于是每次移动的 KV 读取次数等于系统里的分享总数，
+ * 哪怕被移动的路径根本没有分享。现在改走 `share-target:` 反向索引，只读真正相关的分享。
+ */
 export async function retargetSharesForMove(env: Env, sourcePath: string, targetPath: string, recursiveFolder: boolean): Promise<number> {
-  let cursor: string | undefined;
-  let updated = 0;
+  const prefixes = shareTargetSearchPrefixes(sourcePath, recursiveFolder);
 
-  do {
-    const batch = await env.SHARES.list({ prefix: "share:", cursor, limit: 1000 });
-    for (const key of batch.keys) {
-      const code = key.name.slice("share:".length);
+  const seen = new Set<string>();
+  let updated = 0;
+  for (const prefix of prefixes) {
+    const codes = await collectShareCodesByPrefix(env, prefix);
+    for (const code of codes) {
+      if (seen.has(code)) continue;
+      seen.add(code);
+
       const record = await getShareRecordRaw(env, code);
       if (!record) continue;
 
@@ -179,10 +199,80 @@ export async function retargetSharesForMove(env: Env, sourcePath: string, target
       await env.SHARES.put(shareTargetIndexKey(record.kind, record.path, code), "1");
       updated += 1;
     }
-    cursor = batch.list_complete ? undefined : batch.cursor;
-  } while (cursor);
+  }
 
   return updated;
+}
+
+export type ShareListEntry = {
+  code: string;
+  url: string;
+  kind: ShareKind;
+  path: string;
+  createdAt: string;
+  expiresAt: string | null;
+  createdBy: string | null;
+};
+
+/**
+ * 枚举全部分享。
+ *
+ * 直接用 KV 的前缀游标翻页，不额外维护一份索引——KV 的 `list` 本身就是可靠的全量枚举，
+ * 多一份索引就多一份漂移风险。顺路把读到的过期分享清掉。
+ */
+export async function listAllShares(
+  env: Env,
+  origin: string,
+  options: { cursor?: string | null; limit?: number | null } = {}
+): Promise<{ shares: ShareListEntry[]; expiredRemoved: number; cursor: string | null; truncated: boolean }> {
+  const requested = options.limit;
+  const limit = typeof requested === "number" && Number.isFinite(requested) && requested > 0
+    ? Math.min(Math.trunc(requested), 1000)
+    : 200;
+
+  const listOptions: KVNamespaceListOptions = { prefix: SHARE_KEY_PREFIX, limit };
+  if (options.cursor) listOptions.cursor = options.cursor;
+  const batch = await env.SHARES.list(listOptions);
+
+  const shares: ShareListEntry[] = [];
+  let expiredRemoved = 0;
+  for (const key of batch.keys) {
+    const code = key.name.slice(SHARE_KEY_PREFIX.length);
+    const record = await getShareRecordRaw(env, code);
+    if (!record) continue;
+    if (isExpiredShare(record)) {
+      await revokeShare(env, code, record);
+      expiredRemoved += 1;
+      continue;
+    }
+    shares.push({
+      code,
+      url: `${origin}/s/${code}`,
+      kind: record.kind,
+      path: record.path,
+      createdAt: record.createdAt,
+      expiresAt: record.expiresAt,
+      createdBy: record.createdBy || null
+    });
+  }
+
+  shares.sort((left, right) => right.createdAt.localeCompare(left.createdAt, "zh-CN"));
+  return {
+    shares,
+    expiredRemoved,
+    cursor: batch.list_complete ? null : batch.cursor,
+    truncated: !batch.list_complete
+  };
+}
+
+export async function revokeSharesBatch(env: Env, codes: readonly string[]): Promise<{ revoked: number; missing: string[] }> {
+  const missing: string[] = [];
+  let revoked = 0;
+  for (const code of new Set(codes)) {
+    if (await revokeShare(env, code)) revoked += 1;
+    else missing.push(code);
+  }
+  return { revoked, missing };
 }
 
 async function getShareRecordRaw(env: Env, shareCode: string): Promise<ShareRecord | null> {
@@ -220,8 +310,10 @@ async function collectShareCodesByPrefix(env: Env, prefix: string): Promise<stri
   return codes;
 }
 
+const SHARE_KEY_PREFIX = "share:";
+
 function shareStorageKey(code: string): string {
-  return `share:${code}`;
+  return `${SHARE_KEY_PREFIX}${code}`;
 }
 
 function shareTargetIndexKey(kind: ShareKind, path: string, code: string): string {
@@ -232,7 +324,20 @@ function shareTargetIndexPrefix(kind: ShareKind, path: string): string {
   return `share-target:${kind}:${encodePathForShareKey(path)}|`;
 }
 
-function computeRetargetedSharePath(recordPath: string, sourcePath: string, targetPath: string, recursiveFolder: boolean): string | null {
+/**
+ * 找出可能受某个路径影响的分享，用 KV 前缀匹配。
+ *
+ * 文件夹场景要连带子孙：路径经过 `encodeURIComponent` 后，`A/` 变成 `A%2F`，
+ * 而嵌套的 `A/b/c.txt` 变成 `A%2Fb%2Fc.txt`，仍然以 `A%2F` 开头，所以去掉结尾的
+ * `|` 做前缀查询就能一并覆盖。兄弟目录 `Ax/` 编码成 `Ax%2F`，不会被误命中。
+ */
+function shareTargetSearchPrefixes(path: string, recursiveFolder: boolean): string[] {
+  return recursiveFolder
+    ? [`share-target:file:${encodePathForShareKey(path)}`, `share-target:folder:${encodePathForShareKey(path)}`]
+    : [shareTargetIndexPrefix("file", path)];
+}
+
+export function computeRetargetedSharePath(recordPath: string, sourcePath: string, targetPath: string, recursiveFolder: boolean): string | null {
   if (!recursiveFolder) {
     return recordPath === sourcePath ? targetPath : null;
   }

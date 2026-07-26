@@ -129,6 +129,33 @@ export function renderShares(container: HTMLElement, shares: ShareItem[]): void 
   renderIcons(container)
 }
 
+export function renderAllShares(container: HTMLElement, shares: ShareItem[], selected: Set<string>): void {
+  if (!shares.length) {
+    container.innerHTML = `<div class="empty-state">${iconMarkup('share-2')}<strong>暂无分享</strong><span>可以在文件的操作菜单里创建分享链接。</span></div>`
+    renderIcons(container)
+    return
+  }
+
+  container.innerHTML = shares.map((share) => `<article class="data-row share-manage-row">
+    <div class="share-pick"><input type="checkbox" data-share-pick="${escapeHtml(share.code)}" aria-label="选择分享 ${escapeHtml(share.code)}"${selected.has(share.code) ? ' checked' : ''}></div>
+    <div class="data-row-main"><strong>${escapeHtml(share.path)}</strong><span class="mono">${escapeHtml(share.code)} · ${share.kind === 'folder' ? '文件夹' : '文件'}</span></div>
+    <span class="hide-tablet data-cell-muted">${escapeHtml(formatTime(share.createdAt))}</span>
+    <span class="hide-mobile data-cell-muted">${share.expiresAt ? `有效期至 ${escapeHtml(formatTime(share.expiresAt))}` : '永久有效'}</span>
+    <div class="data-row-actions">
+      <button class="icon-btn" type="button" data-copy-url="${escapeHtml(share.url)}" aria-label="复制分享链接" data-tooltip="复制链接">${iconMarkup('copy')}</button>
+      <button class="icon-btn" type="button" data-share-open="${escapeHtml(share.url)}" aria-label="打开分享页" data-tooltip="打开分享页">${iconMarkup('external-link')}</button>
+      <button class="icon-btn" type="button" data-revoke="${escapeHtml(share.code)}" aria-label="撤销分享" data-tooltip="撤销分享">${iconMarkup('trash-2')}</button>
+    </div>
+  </article>`).join('')
+  renderIcons(container)
+}
+
+export function updateShareSelectionView(elements: DashboardElements, selected: Set<string>): void {
+  elements.shareSelectionBar.classList.toggle('hidden', selected.size === 0)
+  elements.shareSelectionCount.textContent = numberFormat.format(selected.size)
+  elements.revokeSelectedShares.disabled = selected.size === 0
+}
+
 export function renderImportTaskDetail(container: HTMLDListElement, task: ImportTask): void {
   const rows: Array<[string, string]> = [
     ['任务 ID', task.id], ['状态', taskLabels[task.status]], ['来源地址', task.sourceUrl], ['目标路径', task.targetPath || task.directory || '/'],

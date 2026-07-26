@@ -102,6 +102,8 @@ export const dashboardStyles = `
   .status-pill.error { color: var(--destructive); background: transparent; }
   .status-pill.running .icon { animation: edgedisk-spin 1s linear infinite; }
   .share-data-row { grid-template-columns: minmax(0, 1fr) auto auto; }
+  .share-manage-row { grid-template-columns: 26px minmax(0, 1.6fr) 150px 160px auto; }
+  .share-pick { display: flex; align-items: center; }
   @keyframes edgedisk-spin { to { transform: rotate(360deg); } }
 
   @media (prefers-reduced-motion: reduce) {
@@ -115,6 +117,7 @@ export const dashboardStyles = `
     .detail-panel { order: -1; }
     .hide-tablet, .time-cell { display: none; }
     .data-row { grid-template-columns: minmax(180px, 1fr) 120px auto; }
+    .share-manage-row { grid-template-columns: 26px minmax(0, 1fr) 160px auto; }
   }
 
   @media (max-width: 620px) {
@@ -131,6 +134,7 @@ export const dashboardStyles = `
     .hide-mobile, .size-cell { display: none; }
     .selection-actions { width: 100%; justify-content: flex-start; }
     .data-row { grid-template-columns: minmax(0, 1fr) auto; }
+    .share-manage-row { grid-template-columns: 26px minmax(0, 1fr) auto; }
     .activity-head { align-items: flex-start; }
     .upload-row { grid-template-columns: minmax(0, 1fr) 70px; }
     .upload-row-bar { display: none; }

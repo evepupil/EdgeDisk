@@ -115,7 +115,9 @@ npx wrangler d1 execute edgedisk --remote --file migrations/0001_import_tasks.sq
 - `/api/import-tasks`（`GET` 列表、`DELETE` 清空已结束任务）
 - `/api/import-tasks/cancel`、`/api/import-tasks/retry`
 - `/api/share`
-- `/api/shares`
+- `/api/shares`（按目标查询）
+- `/api/shares/all`（全局分享列表，支持 `cursor`、`limit`）
+- `/api/shares/revoke-batch`
 
 ### 公开接口
 

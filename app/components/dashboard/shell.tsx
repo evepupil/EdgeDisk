@@ -27,6 +27,7 @@ export function DashboardShell({ appName }: DashboardShellProps) {
         <aside class="sidebar" aria-label="主导航">
           <button class="nav-button active" id="filesNav" type="button" data-panel-target="filesPanel"><Icon name="files" /><span>全部文件</span><span class="nav-count" id="fileNavCount">0</span></button>
           <button class="nav-button" id="importsNav" type="button" data-panel-target="importsPanel"><Icon name="cloud-download" /><span>导入任务</span><span class="nav-count" id="importNavCount">0</span></button>
+          <button class="nav-button" id="sharesNav" type="button" data-panel-target="sharesPanel"><Icon name="share-2" /><span>分享管理</span><span class="nav-count" id="shareNavCount">0</span></button>
           <button class="nav-button" id="trashNav" type="button" data-panel-target="trashPanel"><Icon name="trash-2" /><span>回收站</span><span class="nav-count" id="trashNavCount">0</span></button>
           <div class="sidebar-spacer" />
           <div class="storage-block"><span>存储空间</span><div class="storage-track"><span /></div><small>Cloudflare R2</small></div>
@@ -35,6 +36,7 @@ export function DashboardShell({ appName }: DashboardShellProps) {
         <main class="main-area">
           <FilePanel />
           <ImportsPanel />
+          <SharesPanel />
           <TrashPanel />
         </main>
       </div>
@@ -111,6 +113,23 @@ function DetailPanel() {
 
 function ImportsPanel() {
   return <section class="app-panel hidden" id="importsPanel"><div class="page-heading"><div><h1>导入任务</h1><p>查看从 URL 导入的文件进度和结果。</p></div><div class="heading-actions"><button class="btn" id="refreshImports" type="button"><Icon name="refresh-cw" />刷新</button><button class="btn" id="clearFinishedImports" type="button"><Icon name="trash-2" />清空已结束</button><button class="btn primary" id="newImportFromPanel" type="button"><Icon name="plus" />新建导入</button></div></div><div class="status" id="importStatus" aria-live="polite" /><div class="data-list" id="importTasks"><div class="empty-state"><Icon name="cloud-download" /><strong>暂无导入任务</strong></div></div></section>
+}
+
+function SharesPanel() {
+  return (
+    <section class="app-panel hidden" id="sharesPanel">
+      <div class="page-heading">
+        <div><h1>分享管理</h1><p>集中查看和撤销所有分享链接，过期链接会在刷新时自动清理。</p></div>
+        <div class="heading-actions"><button class="btn" id="refreshAllShares" type="button"><Icon name="refresh-cw" />刷新</button></div>
+      </div>
+      <div class="selection-bar hidden" id="shareSelectionBar">
+        <strong><span id="shareSelectionCount">0</span> 个分享已选择</strong>
+        <div class="selection-actions"><button class="btn quiet" id="revokeSelectedShares" type="button"><Icon name="trash-2" />批量撤销</button></div>
+      </div>
+      <div class="status" id="allSharesStatus" aria-live="polite" />
+      <div class="data-list" id="allSharesList"><div class="empty-state"><Icon name="share-2" /><strong>暂无分享</strong></div></div>
+    </section>
+  )
 }
 
 function TrashPanel() {

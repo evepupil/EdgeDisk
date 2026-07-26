@@ -12,7 +12,15 @@ import {
 } from './services/import-service.ts'
 import { createFolder, getObjectDetail, listDirectory, moveObject, streamObject } from './objects'
 import { normalizeAnyPath, normalizeDirectoryPath, normalizeFilePath, parseOptionalNonNegativeNumber } from './path'
-import { createShare, listSharesByTarget, retargetSharesForMove, revokeShare, revokeSharesForPath } from './shares'
+import {
+  createShare,
+  listAllShares,
+  listSharesByTarget,
+  retargetSharesForMove,
+  revokeShare,
+  revokeSharesBatch,
+  revokeSharesForPath
+} from './shares'
 import { listTrashItems, moveToTrash, permanentlyDeleteTrashItem, restoreTrashItem } from './trash'
 import {
   abortMultipartUpload,
@@ -51,6 +59,13 @@ const shareDeleteSchema = z.object({ code: z.string().trim().min(1, '\u7f3a\u5c1
 const sharesQuerySchema = z.object({
   kind: z.enum(['file', 'folder']),
   path: z.string().trim().min(1, '\u7f3a\u5c11 path \u53c2\u6570')
+})
+const allSharesQuerySchema = z.object({
+  cursor: z.string().optional(),
+  limit: z.string().optional()
+})
+const shareRevokeBatchSchema = z.object({
+  codes: z.array(z.string().trim().min(1)).min(1, '\u6ca1\u6709\u9700\u8981\u64a4\u9500\u7684\u5206\u4eab')
 })
 const uploadTargetSchema = z.object({ path: z.string().trim().min(1, '\u7f3a\u5c11 path \u53c2\u6570') })
 const uploadPartQuerySchema = z.object({
@@ -225,6 +240,20 @@ api.get('/shares', zValidator('query', sharesQuerySchema), async (c) => {
   const requestUrl = new URL(c.req.url)
   const normalizedPath = query.kind === 'folder' ? normalizeDirectoryPath(query.path) : normalizeFilePath(query.path)
   return c.json({ shares: await listSharesByTarget(c.env, query.kind, normalizedPath, requestUrl.origin) })
+})
+
+api.get('/shares/all', zValidator('query', allSharesQuerySchema), async (c) => {
+  const query = c.req.valid('query')
+  const requestUrl = new URL(c.req.url)
+  return c.json(await listAllShares(c.env, requestUrl.origin, {
+    cursor: query.cursor || null,
+    limit: query.limit ? Number.parseInt(query.limit, 10) : null
+  }))
+})
+
+api.post('/shares/revoke-batch', zValidator('json', shareRevokeBatchSchema), async (c) => {
+  const payload = c.req.valid('json')
+  return c.json(await revokeSharesBatch(c.env, payload.codes))
 })
 
 export default api
