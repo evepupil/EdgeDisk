@@ -23,7 +23,8 @@
     {
       "binding": "IMPORTS_DB",
       "database_name": "edgedisk",
-      "database_id": "3fd28f72-073d-4b10-b50e-504af186bdad"
+      "database_id": "3fd28f72-073d-4b10-b50e-504af186bdad",
+      "migrations_dir": "./migrations"
     }
   ],
   "queues": {

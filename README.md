@@ -88,18 +88,10 @@ npm run deploy
 
 ### D1 初始化
 
-按顺序执行 `migrations/` 下的所有文件：
+`wrangler.jsonc` 已配置 `migrations_dir`，按迁移记录应用所有 D1 结构：
 
 ```bash
-npx wrangler d1 execute edgedisk --remote --file migrations/0001_import_tasks.sql
-```
-
-```bash
-npx wrangler d1 execute edgedisk --remote --file migrations/0002_trash_items.sql
-```
-
-```bash
-npx wrangler d1 execute edgedisk --remote --file migrations/0003_file_index.sql
+npx wrangler d1 migrations apply edgedisk --remote
 ```
 
 `file_index` 是全盘搜索用的文件索引。存量文件不会自动进索引，建表后需要调一次

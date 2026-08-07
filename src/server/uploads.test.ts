@@ -1,6 +1,7 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { HttpError } from './errors.ts'
 import { FOLDER_MARKER } from './objects.ts'
+import { upsertIndexedFile } from './repos/file-index-repo.ts'
 import { TRASH_PREFIX } from './storage.ts'
 import type { Env } from './types.ts'
 import {
@@ -14,6 +15,18 @@ import {
   resolvePartSize,
   sortParts
 } from './uploads.ts'
+
+vi.mock('./repos/file-index-repo.ts', () => ({
+  deleteIndexedFile: vi.fn(),
+  deleteIndexedFilesByPrefix: vi.fn(),
+  upsertIndexedFile: vi.fn(),
+  upsertIndexedFiles: vi.fn()
+}))
+
+afterEach(() => {
+  vi.restoreAllMocks()
+  vi.mocked(upsertIndexedFile).mockReset()
+})
 
 function env(uploadPartBytes?: string): Env {
   return { UPLOAD_PART_BYTES: uploadPartBytes } as unknown as Env
@@ -61,6 +74,31 @@ describe('assertWritableFilePath', () => {
   it('名字里只是包含标记片段的正常文件不受影响', () => {
     const path = `docs/my${FOLDER_MARKER}notes.txt`
     expect(assertWritableFilePath(path)).toBe(path)
+  })
+})
+
+describe('putDirectObject', () => {
+  it('D1 索引不可用时仍保留已完成的 R2 上传', async () => {
+    const { putDirectObject } = await import('./uploads.ts')
+    const put = vi.fn().mockResolvedValue({
+      key: 'loras/model.safetensors',
+      size: 42,
+      uploaded: new Date('2026-08-07T00:00:00.000Z'),
+      httpMetadata: { contentType: 'application/octet-stream' }
+    })
+    const env = { DISK: { put }, IMPORTS_DB: {} } as unknown as Env
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    vi.mocked(upsertIndexedFile).mockRejectedValueOnce(new Error('missing file_index'))
+
+    const result = await putDirectObject(env, 'loras/model.safetensors', new ReadableStream(), null)
+
+    expect(result).toEqual({ path: 'loras/model.safetensors', size: 42 })
+    expect(put).toHaveBeenCalledOnce()
+    expect(upsertIndexedFile).toHaveBeenCalledOnce()
+    expect(errorSpy).toHaveBeenCalledWith(
+      'file_index sync failed after R2 upload; run /api/search/reindex',
+      'Error'
+    )
   })
 })
 

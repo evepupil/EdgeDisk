@@ -109,12 +109,20 @@ export async function completeMultipartUpload(env: Env, key: string, uploadId: s
 
 /** 上传成功后同步文件索引，让新文件立刻能被搜到。 */
 async function indexUploadedObject(env: Env, object: R2Object): Promise<void> {
-  await upsertIndexedFile(env, {
-    path: object.key,
-    size: object.size,
-    contentType: object.httpMetadata?.contentType || null,
-    uploaded: object.uploaded ? object.uploaded.toISOString() : null
-  });
+  try {
+    await upsertIndexedFile(env, {
+      path: object.key,
+      size: object.size,
+      contentType: object.httpMetadata?.contentType || null,
+      uploaded: object.uploaded ? object.uploaded.toISOString() : null
+    });
+  } catch (error) {
+    // R2 is the source of truth; a missing or unavailable index must not turn a completed upload into an error.
+    console.error(
+      "file_index sync failed after R2 upload; run /api/search/reindex",
+      error instanceof Error ? error.name : "unknown"
+    );
+  }
 }
 
 export async function abortMultipartUpload(env: Env, key: string, uploadId: string) {
